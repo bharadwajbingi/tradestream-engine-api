@@ -1,0 +1,10 @@
+springdoc:
+  swagger-ui:
+    enabled: true
+    persist-authorization: true
+  api-docs:
+    enabled: true
+
+logging:
+  level:
+    com.mphasis.tse: DEBUG

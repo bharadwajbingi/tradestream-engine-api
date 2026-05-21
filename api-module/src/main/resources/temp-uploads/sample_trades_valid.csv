@@ -1,0 +1,6 @@
+transactionId,fileHeaderDate,accountNumber,transactionType,batchLocation,batchNumber,updateBatchDate,relatedFileNumber,actionName,relatedFileKey,doNotReportFlag,explanation,minorAssetsClass,owningPortfolio,posterInitials,transactionSubtype,cashEffect,cashPaidOut,brokerNumber,oldBalance,newBalance
+TXN00101,20260520,ACC0001,1,NY,1001,20260520,1234,BUY,998877,N,Purchased Apple Inc Shares,5,501,JD,10,15000.00,15000.00,55,100000.00,115000.00
+TXN00102,20260520,ACC0002,2,LON,1001,20260520,1235,SELL,998878,N,Sold Microsoft Shares,5,502,AB,20,-8500.00,0.00,56,45000.00,36500.00
+TXN00103,20260520,ACC0003,1,TOK,1002,20260520,1236,BUY,998879,N,Purchased Tesla Shares,3,503,XY,10,4200.75,4200.75,57,12500.00,16700.75
+TXN00104,20260520,ACC0004,1,NY,1002,20260520,1237,BUY,998880,Y,Standard treasury bond buy,6,504,JD,15,50000.00,50000.00,55,200000.00,250000.00
+TXN00105,20260520,ACC0005,2,NY,1003,20260520,1238,SELL,998881,N,Liquidity adjustment,2,505,MZ,25,-1200.50,1200.50,58,8900.00,7699.50

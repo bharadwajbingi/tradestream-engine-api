@@ -21,6 +21,9 @@ public class TradeTransaction {
     @Column(name = "transaction_id")
     private String transactionId;
 
+    @Column(name = "record_tracking_id", length = 64)
+    private String recordTrackingId;
+
     @Column(name = "file_header_date")
     private String fileHeaderDate;
 
@@ -80,6 +83,9 @@ public class TradeTransaction {
 
     @Column(name = "new_balance")
     private BigDecimal newBalance;
+
+    @Column(name = "row_number")
+    private Integer rowNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "file_id")

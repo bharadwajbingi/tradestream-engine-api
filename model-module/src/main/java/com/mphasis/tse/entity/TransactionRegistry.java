@@ -2,6 +2,7 @@ package com.mphasis.tse.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
@@ -9,14 +10,19 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "transaction_registry")
 @Data
+@NoArgsConstructor
 public class TransactionRegistry {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "transaction_id", nullable = false, unique = true)
+    @Column(name = "transaction_id", nullable = false)
     private String transactionId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 
     @CreationTimestamp
     @Column(name = "created_time")
@@ -24,5 +30,10 @@ public class TransactionRegistry {
 
     public TransactionRegistry(String transactionId) {
         this.transactionId = transactionId;
+    }
+
+    public TransactionRegistry(String transactionId, User user) {
+        this.transactionId = transactionId;
+        this.user = user;
     }
 }

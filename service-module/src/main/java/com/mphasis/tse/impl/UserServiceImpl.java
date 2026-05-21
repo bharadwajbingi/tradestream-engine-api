@@ -18,7 +18,15 @@ public class UserServiceImpl implements UserService {
         var user = repo.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        return new ProfileResponse(user.getEmail());
+        return new ProfileResponse(user.getEmail(), user.getName());
+    }
+
+    @Override
+    public void updateProfileName(String email, String name) {
+        var user = repo.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setName(name);
+        repo.save(user);
     }
 
 

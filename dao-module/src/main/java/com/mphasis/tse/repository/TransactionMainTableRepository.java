@@ -13,9 +13,35 @@ public interface TransactionMainTableRepository
 
     @Modifying
     @Transactional
-    @Query(
-            value = "DELETE FROM trade_transaction WHERE file_id = :fileId",
-            nativeQuery = true
-    )
+    @Query(value = "DELETE FROM trade_transaction WHERE file_id = :fileId", nativeQuery = true)
     void deleteByFileId(@Param("fileId") Long fileId);
+
+    boolean existsByTransactionId(String transactionId);
+
+    @Query("SELECT CASE WHEN COUNT(t) > 0 THEN true ELSE false END FROM TradeTransaction t WHERE t.transactionId = :transactionId AND t.metaData.user.id = :userId")
+    boolean existsByTransactionIdAndUserId(@Param("transactionId") String transactionId, @Param("userId") Long userId);
+
+    @Query("""
+           SELECT CASE WHEN COUNT(t) > 0 THEN true ELSE false END
+           FROM TradeTransaction t
+           WHERE t.transactionId = :transactionId
+             AND ((:userId IS NULL AND t.metaData.user IS NULL) OR t.metaData.user.id = :userId)
+           """)
+    boolean existsByTransactionIdForOwner(@Param("transactionId") String transactionId,
+                                          @Param("userId") Long userId);
+
+    @Query("SELECT COUNT(t) FROM TradeTransaction t WHERE t.metaData.user.id = :userId")
+    long countByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT t FROM TradeTransaction t WHERE t.metaData.fileId = :fileId")
+    java.util.List<TradeTransaction> findByFileId(@Param("fileId") Long fileId);
+
+    @Query("SELECT t FROM TradeTransaction t WHERE t.metaData.fileId = :fileId AND t.metaData.user.id = :userId")
+    java.util.List<TradeTransaction> findByFileIdAndUserId(@Param("fileId") Long fileId, @Param("userId") Long userId);
+
+    @Query("SELECT t FROM TradeTransaction t WHERE (:start IS NULL OR t.fileHeaderDate >= :start) AND (:end IS NULL OR t.fileHeaderDate <= :end)")
+    java.util.List<TradeTransaction> findByFileHeaderDateBetween(@Param("start") String start, @Param("end") String end);
+
+    @Query("SELECT t FROM TradeTransaction t WHERE t.metaData.user.id = :userId AND (:start IS NULL OR t.fileHeaderDate >= :start) AND (:end IS NULL OR t.fileHeaderDate <= :end)")
+    java.util.List<TradeTransaction> findByFileHeaderDateBetweenAndUserId(@Param("start") String start, @Param("end") String end, @Param("userId") Long userId);
 }

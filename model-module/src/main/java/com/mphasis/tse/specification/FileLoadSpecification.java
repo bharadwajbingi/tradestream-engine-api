@@ -1,6 +1,7 @@
 package com.mphasis.tse.specification;
 
 import com.mphasis.tse.entity.FileLoadMetaData;
+import com.mphasis.tse.enums.FileStatus;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
@@ -9,6 +10,11 @@ import java.time.LocalDateTime;
 
 
 public class FileLoadSpecification {
+
+    public static Specification<FileLoadMetaData> belongsToUser(Long userId) {
+        return (root, query, cb) ->
+                cb.equal(root.get("user").get("id"), userId);
+    }
 
     public static Specification<FileLoadMetaData> hasFileId(Long fileId) {
         return (root, query, cb) ->
@@ -25,7 +31,7 @@ public class FileLoadSpecification {
 
     public static Specification<FileLoadMetaData> hasStatus(String status) {
         return (root, query, cb) ->
-                cb.equal(root.get("status"), status);
+                cb.equal(root.get("status"), FileStatus.valueOf(status.toUpperCase()));
     }
 
     public static Specification<FileLoadMetaData> hasUploadTimeBetween(

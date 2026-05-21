@@ -3,7 +3,9 @@ package com.mphasis.tse.config.listener;
 import com.mphasis.tse.entity.FileLoadMetaData;
 import com.mphasis.tse.enums.FileStatus;
 import com.mphasis.tse.exception.FileNotFoundException;
+import com.mphasis.tse.repository.TransactionErrorRepository;
 import com.mphasis.tse.repository.TransactionMetaTableRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -20,8 +22,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class JobListenerTest {
@@ -29,6 +30,8 @@ class JobListenerTest {
     private JobListener jobListener;
     @Mock
     private TransactionMetaTableRepository repository;
+    @Mock
+    private TransactionErrorRepository transactionErrorRepository;
     @Mock
     private JobExecution jobExecution;
     @Mock
@@ -41,6 +44,11 @@ class JobListenerTest {
     private StepExecution stepExecution;
     private FileLoadMetaData fileLoadMetaData;
 
+    @BeforeEach
+    void setUp() {
+        lenient().when(transactionErrorRepository.countByMetaData_FileIdAndStatusIn(anyLong(), anyList()))
+                .thenReturn(0L);
+    }
 
     @Test
     void testBeforeJob_success() {
@@ -97,6 +105,7 @@ class JobListenerTest {
     @Test
     void testAfterJob_completedWithErrors() {
         fileLoadMetaData = new FileLoadMetaData();
+        when(transactionErrorRepository.countByMetaData_FileIdAndStatusIn(anyLong(), anyList())).thenReturn(2L);
         when(jobExecution.getJobInstance()).thenReturn(jobInstance);
         when(jobInstance.getJobName()).thenReturn("testJob");
         when(jobExecution.getJobParameters()).thenReturn(jobParameters);

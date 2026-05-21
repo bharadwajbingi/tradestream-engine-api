@@ -26,6 +26,9 @@ public class TransactionError {
     @Column(name = "transaction_id")
     private String transactionId;
 
+    @Column(name = "record_tracking_id", length = 64)
+    private String recordTrackingId;
+
     @Column(name = "account_number")
     private String accountNumber;
 
@@ -41,6 +44,9 @@ public class TransactionError {
 
     @Column(name = "created_time")
     private LocalDateTime createdTime;
+
+    @Column(name = "row_number")
+    private Integer rowNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "file_id")

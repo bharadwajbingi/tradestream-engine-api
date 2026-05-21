@@ -14,8 +14,14 @@ public class ApiResponse<T> {
     @JsonProperty("status")
     private String status;
 
+    @JsonProperty("success")
+    private boolean success;
+
     @JsonProperty("code")
     private Integer code;
+
+    @JsonProperty("statusCode")
+    private Integer statusCode;
 
     @JsonProperty("message")
     private String message;
@@ -26,7 +32,9 @@ public class ApiResponse<T> {
     public ApiResponse(String status, Integer code, String message, T data) {
         this.timestamp = LocalDateTime.now();
         this.status = status;
+        this.success = code != null && code >= 200 && code < 300;
         this.code = code;
+        this.statusCode = code;
         this.message = message;
         this.data = data;
     }

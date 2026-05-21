@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/trade_db_test}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  flyway:
+    clean-disabled: false
+
+security:
+  jwt:
+    secret: test-trade-stream-engine-secret-123456
+
+logging:
+  level:
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN

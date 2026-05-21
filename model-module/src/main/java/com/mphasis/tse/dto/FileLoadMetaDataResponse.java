@@ -12,6 +12,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class FileLoadMetaDataResponse {
     private Long id;
+    private Long fileId;
+    private Long userId;
 
     private String filename;
     private LocalDateTime uploadTime;

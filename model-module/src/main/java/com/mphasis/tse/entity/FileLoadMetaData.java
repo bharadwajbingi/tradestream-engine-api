@@ -22,6 +22,10 @@ public class FileLoadMetaData {
     @Column(name = "filename", nullable = false)
     private String filename;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
     @Column(name = "upload_time")
     private LocalDateTime uploadTime;
 
@@ -38,6 +42,9 @@ public class FileLoadMetaData {
     @Column(name = "status")
     private FileStatus status;
 
+    @Column(name = "is_deleted")
+    private Boolean isDeleted = false;
 
-
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 }

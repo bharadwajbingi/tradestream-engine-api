@@ -1,9 +1,9 @@
 package com.mphasis.tse.config.processor;
 
-import com.mphasis.tse.config.listener.JobListener;
 import com.mphasis.tse.entity.*;
 import com.mphasis.tse.mapper.TradeTransactionMapper;
-import com.mphasis.tse.repository.TransactionRegistryRepository;
+import com.mphasis.tse.repository.TransactionMainTableRepository;
+import com.mphasis.tse.repository.TransactionMetaTableRepository;
 import com.mphasis.tse.validation.ValidationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,48 +17,61 @@ class TradeRecordProcessorTest {
     @Mock
     private TradeTransactionMapper tradeTransactionMapper;
     @Mock
-    private TransactionRegistryRepository transactionRegistryRepository;
+    private TransactionMainTableRepository transactionMainTableRepository;
     @Mock
-    private JobListener jobListener;
-    @InjectMocks
+    private TransactionMetaTableRepository transactionMetaTableRepository;
     private TradeRecordProcessor processor;
     private String[] row;
+    private FileLoadMetaData fileLoadMetaData;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        row = new String[21];
+        processor = new TradeRecordProcessor(
+                validationService,
+                tradeTransactionMapper,
+                transactionMainTableRepository,
+                transactionMetaTableRepository,
+                1L
+        );
+        row = new String[22];
         row[0] = "TXN123";
         row[2] = "ACC123";
-        when(jobListener.getFileLoadMetaData()).thenReturn(new FileLoadMetaData());
-        when(jobListener.getSeenTransactionIds()).thenReturn(new HashSet<>());
+        row[21] = "2";
+        fileLoadMetaData = new FileLoadMetaData();
+        fileLoadMetaData.setFileId(1L);
+        User user = new User();
+        user.setId(42L);
+        fileLoadMetaData.setUser(user);
+        when(transactionMetaTableRepository.findById(1L)).thenReturn(Optional.of(fileLoadMetaData));
     }
 
     @Test
-    void testDuplicateInRegistry() {
-        when(transactionRegistryRepository.existsByTransactionId("TXN123"))
+    void testDuplicateInSystem() {
+        when(transactionMainTableRepository.existsByTransactionIdForOwner("TXN123", 42L))
                 .thenReturn(true);
         TradeWrapper result = processor.process(row);
         assertNotNull(result.getErrors());
         assertFalse(result.getErrors().isEmpty());
-        assertEquals("Duplicate in registry", result.getErrors().get(0).getErrorMessage());
+        assertEquals("Duplicate transaction in system success table", result.getErrors().get(0).getErrorMessage());
     }
 
     @Test
     void testDuplicateInCurrentBatch() {
-        Set<String> seenIds = new HashSet<>();
-        seenIds.add("TXN123");
-        when(jobListener.getSeenTransactionIds()).thenReturn(seenIds);
-        when(transactionRegistryRepository.existsByTransactionId("TXN123"))
+        when(transactionMainTableRepository.existsByTransactionIdForOwner("TXN123", 42L))
                 .thenReturn(false);
+        when(validationService.validate(any(), any())).thenReturn(Collections.emptyList());
+        when(tradeTransactionMapper.toEntity(any())).thenReturn(new TradeTransaction());
+        processor.process(row);
         TradeWrapper result = processor.process(row);
         assertNotNull(result.getErrors());
         assertFalse(result.getErrors().isEmpty());
-        assertEquals("Duplicate in current batch", result.getErrors().get(0).getErrorMessage());
+        assertEquals("Duplicate transaction in current batch", result.getErrors().get(0).getErrorMessage());
     }
 
     @Test
     void testValidationErrors() {
-        when(transactionRegistryRepository.existsByTransactionId("TXN123"))
+        when(transactionMainTableRepository.existsByTransactionIdForOwner("TXN123", 42L))
                 .thenReturn(false);
         List<TransactionError> errors = List.of(
                 TransactionError.builder()
@@ -75,7 +88,7 @@ class TradeRecordProcessorTest {
 
     @Test
     void testSuccessfulProcessing() {
-        when(transactionRegistryRepository.existsByTransactionId("TXN123"))
+        when(transactionMainTableRepository.existsByTransactionIdForOwner("TXN123", 42L))
                 .thenReturn(false);
         when(validationService.validate(any(), any()))
                 .thenReturn(Collections.emptyList());

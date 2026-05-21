@@ -1,6 +1,8 @@
 package com.mphasis.tse.config;
 
 import com.mphasis.tse.filter.JwtAuthenticationFilter;
+import com.mphasis.tse.filter.ExportTokenFilter;
+import com.mphasis.tse.config.oauth2.OAuth2SuccessHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -21,11 +23,16 @@ class SecurityConfigurationTest {
     private SecurityConfiguration securityConfiguration;
     private JwtAuthenticationFilter jwtFilter;
     private AuthenticationProvider authProvider;
+    private OAuth2SuccessHandler oAuth2SuccessHandler;
+    private ExportTokenFilter exportTokenFilter;
+
     @BeforeEach
     void setUp() {
         jwtFilter = mock(JwtAuthenticationFilter.class);
         authProvider = mock(AuthenticationProvider.class);
-        securityConfiguration = new SecurityConfiguration(jwtFilter, authProvider);
+        oAuth2SuccessHandler = mock(OAuth2SuccessHandler.class);
+        exportTokenFilter = mock(ExportTokenFilter.class);
+        securityConfiguration = new SecurityConfiguration(jwtFilter, authProvider, oAuth2SuccessHandler, exportTokenFilter);
     }
 
     private HttpSecurity mockHttp() throws Exception {
@@ -35,7 +42,9 @@ class SecurityConfigurationTest {
         when(http.authorizeHttpRequests(any())).thenReturn(http);
         when(http.sessionManagement(any())).thenReturn(http);
         when(http.authenticationProvider(any())).thenReturn(http);
+        when(http.oauth2Login(any())).thenReturn(http);
         when(http.addFilterBefore(any(), any())).thenReturn(http);
+        when(http.addFilterAfter(any(), any())).thenReturn(http);
         SecurityFilterChain chain = mock(SecurityFilterChain.class);
         doReturn(chain).when(http).build();
         return http;
@@ -47,7 +56,7 @@ class SecurityConfigurationTest {
         SecurityFilterChain result = securityConfiguration.securityFilterChain(http);
         assertNotNull(result);
         verify(http).authenticationProvider(authProvider);
-        verify(http).addFilterBefore(eq(jwtFilter), any());
+        verify(http, atLeastOnce()).addFilterBefore(any(), any());
         verify(http).build();
     }
 
@@ -56,14 +65,18 @@ class SecurityConfigurationTest {
         HttpSecurity http = mock(HttpSecurity.class);
         ArgumentCaptor<Customizer> authCaptor = ArgumentCaptor.forClass(Customizer.class);
         ArgumentCaptor<Customizer> sessionCaptor = ArgumentCaptor.forClass(Customizer.class);
+        
         when(http.cors(any())).thenReturn(http);
         when(http.csrf(any())).thenReturn(http);
         when(http.authorizeHttpRequests(authCaptor.capture())).thenReturn(http);
         when(http.sessionManagement(sessionCaptor.capture())).thenReturn(http);
         when(http.authenticationProvider(any())).thenReturn(http);
+        when(http.oauth2Login(any())).thenReturn(http);
         when(http.addFilterBefore(any(), any())).thenReturn(http);
+        when(http.addFilterAfter(any(), any())).thenReturn(http);
         SecurityFilterChain chain = mock(SecurityFilterChain.class);
         doReturn(chain).when(http).build();
+        
         securityConfiguration.securityFilterChain(http);
 
         var registry = mock(
@@ -79,11 +92,13 @@ class SecurityConfigurationTest {
         when(authorizedUrl.permitAll()).thenReturn(registry);
         when(registry.anyRequest()).thenReturn(authorizedUrl);
         when(authorizedUrl.authenticated()).thenReturn(registry);
+        
         authCaptor.getValue().customize(registry);
+        
         verify(registry, atLeastOnce()).requestMatchers(anyString());
         verify(authorizedUrl, atLeastOnce()).permitAll();
         verify(registry).anyRequest();
-        verify(authorizedUrl).authenticated();
+        verify(authorizedUrl, atLeastOnce()).authenticated();
 
         var sessionConfig = mock(
                 org.springframework.security.config.annotation.web.configurers

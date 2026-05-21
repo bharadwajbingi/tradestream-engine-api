@@ -11,4 +11,5 @@ public class BatchUtils {
     public static final String JOB_NAME = "tradeFileProcessingJob";
 
     public static final String DELIMITER=",";
+    public static final int EXPECTED_TRADE_COLUMNS = 21;
 }

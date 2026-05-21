@@ -6,4 +6,5 @@ public interface UserService {
 
 
     ProfileResponse getProfile(String email);
+    void updateProfileName(String email, String name);
 }

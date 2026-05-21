@@ -35,6 +35,9 @@ class FileServiceImplTest {
     @Mock private AsyncProcessingService asyncService;
     @Mock private TransactionMainTableRepository mainRepo;
     @Mock private TradeArchiveRepository archiveRepo;
+    @Mock private DeletedTradeTransactionRepository deletedTradeTransactionRepository;
+    @Mock private DeletedTransactionErrorRepository deletedTransactionErrorRepository;
+    @Mock private UserRepository userRepository;
     @Mock private TransactionErrorMapper errorMapper;
     @Mock private FileLoadMetaDataMapper metaMapper;
 
@@ -61,7 +64,7 @@ class FileServiceImplTest {
 
     @Test
     void testGetMetrics() {
-        when(metaRepo.count()).thenReturn(1L);
+        when(metaRepo.countActiveFiles()).thenReturn(1L);
         when(mainRepo.count()).thenReturn(2L);
         when(errorRepo.countDistinctByStatus(ErrorStatus.FAILED)).thenReturn(3L);
 
@@ -108,6 +111,9 @@ class FileServiceImplTest {
 
         fileService.deleteFileLoad(1L);
 
+        verify(deletedTradeTransactionRepository).moveByFileId(eq(1L), any());
+        verify(deletedTradeTransactionRepository).moveFromArchiveByFileId(eq(1L), any());
+        verify(deletedTransactionErrorRepository).moveByFileId(eq(1L), any());
         assertEquals(FileStatus.DELETED, meta.getStatus());
     }
 
@@ -325,7 +331,7 @@ class FileServiceImplTest {
 
         when(metaRepo.findAll()).thenReturn(List.of(f1, f2, f3));
 
-        assertEquals(1, fileService.getAllFileLoads().size());
+        assertEquals(2, fileService.getAllFileLoads().size());
     }
 
     @Test
@@ -338,6 +344,6 @@ class FileServiceImplTest {
 
         when(metaRepo.findAll()).thenReturn(List.of(f1, f2));
 
-        assertTrue(fileService.getAllFileLoads().isEmpty());
+        assertEquals(1, fileService.getAllFileLoads().size());
     }
 }

@@ -1,8 +1,10 @@
 package com.mphasis.tse.config.writer;
 
+import com.mphasis.tse.entity.FileLoadMetaData;
 import com.mphasis.tse.entity.TradeTransaction;
 import com.mphasis.tse.entity.TradeWrapper;
 import com.mphasis.tse.entity.TransactionError;
+import com.mphasis.tse.entity.User;
 import com.mphasis.tse.enums.ErrorStatus;
 import com.mphasis.tse.repository.TransactionErrorRepository;
 import com.mphasis.tse.repository.TransactionMainTableRepository;
@@ -46,6 +48,7 @@ void testWrite_withSuccessfulTransactions() {
     txn.setTransactionId("TXN123");
     txn.setAccountNumber("ACC1001");
     txn.setTransactionType(1);
+    txn.setMetaData(metaDataForUser(42L));
     TradeWrapper wrapper = new TradeWrapper();
     wrapper.setTradeTransaction(txn);
     Chunk<TradeWrapper> chunk = new Chunk<>();
@@ -94,7 +97,9 @@ void testWrite_withSuccessfulTransactions() {
 
         TradeTransaction txn = new TradeTransaction();
         txn.setTransactionId("TXN1");
+        txn.setMetaData(metaDataForUser(42L));
         TransactionError error = new TransactionError();
+        error.setMetaData(metaDataForUser(42L));
         TradeWrapper wrapper = new TradeWrapper();
         wrapper.setTradeTransaction(txn);
         wrapper.setErrors(List.of(error));
@@ -112,7 +117,7 @@ void testWrite_withSuccessfulTransactions() {
         verify(transactionRegistryRepository).saveAll(anyList());
         verify(transactionErrorRepository).saveAll(anyList());
         verify(transactionErrorRepository)
-                .updateStatusByTransactionIds(anyList(), eq(ErrorStatus.RESOLVED));
+                .updateStatusByTransactionIdsAndUserId(anyList(), eq(ErrorStatus.RESOLVED), eq(42L));
         verify(executionContext).putInt("successCount", 1);
         verify(executionContext).putInt("errorCount", 1);
     }
@@ -153,6 +158,7 @@ void testWrite_withSuccessfulTransactions() {
     void testWrite_withNullErrors() {
         TradeTransaction txn = new TradeTransaction();
         txn.setTransactionId("TXN1");
+        txn.setMetaData(metaDataForUser(42L));
         TradeWrapper wrapper = new TradeWrapper();
         wrapper.setTradeTransaction(txn);
         wrapper.setErrors(null);
@@ -175,6 +181,7 @@ void testWrite_withSuccessfulTransactions() {
     void testWrite_withEmptyErrorsList() {
         TradeTransaction txn = new TradeTransaction();
         txn.setTransactionId("TXN1");
+        txn.setMetaData(metaDataForUser(42L));
         TradeWrapper wrapper = new TradeWrapper();
         wrapper.setTradeTransaction(txn);
         wrapper.setErrors(Collections.emptyList());
@@ -189,6 +196,14 @@ void testWrite_withSuccessfulTransactions() {
         verify(tradeTransactionRepository).saveAll(anyList());
         verify(transactionErrorRepository, never()).saveAll(anyList());
         verify(executionContext).putInt("errorCount", 0);
+    }
+
+    private FileLoadMetaData metaDataForUser(Long userId) {
+        FileLoadMetaData metaData = new FileLoadMetaData();
+        User user = new User();
+        user.setId(userId);
+        metaData.setUser(user);
+        return metaData;
     }
 
 }

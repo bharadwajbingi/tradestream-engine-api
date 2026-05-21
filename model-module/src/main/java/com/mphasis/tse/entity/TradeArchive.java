@@ -20,6 +20,9 @@ public class TradeArchive {
     @Column(name = "transaction_id")
     private String transactionId;
 
+    @Column(name = "record_tracking_id", length = 64)
+    private String recordTrackingId;
+
     @Column(name = "file_header_date")
     private String fileHeaderDate;
 

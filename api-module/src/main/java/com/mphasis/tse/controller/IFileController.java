@@ -18,12 +18,25 @@ public interface IFileController {
     @GetMapping("/errors")
     ResponseEntity<ApiResponse<List<TransactionErrorResponse>>> getAllErrors();
 
+    @GetMapping("/errors/page")
+    ResponseEntity<ApiResponse<PageResponse<TransactionErrorResponse>>> getAllErrorsPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size);
+
     @PostMapping("/search")
     ResponseEntity<ApiResponse<List<FileLoadMetaDataResponse>>> searchFiles(
             @RequestBody FileSearchRequest request);
 
+    @PostMapping("/search/page")
+    ResponseEntity<ApiResponse<PageResponse<FileLoadMetaDataResponse>>> searchFilesPage(
+            @RequestBody FileSearchRequest request);
+
     @PostMapping("/search-errors")
     ResponseEntity<ApiResponse<List<TransactionErrorResponse>>> searchFileErrors(
+            @RequestBody TransactionErrorSearchRequest request);
+
+    @PostMapping("/search-errors/page")
+    ResponseEntity<ApiResponse<PageResponse<TransactionErrorResponse>>> searchFileErrorsPage(
             @RequestBody TransactionErrorSearchRequest request);
 
     @PutMapping("/modify")
@@ -47,6 +60,17 @@ public interface IFileController {
     @GetMapping("/getAll")
     ResponseEntity<ApiResponse<List<FileLoadMetaDataResponse>>> getAllFileLoads();
 
+    @GetMapping("/getAll/page")
+    ResponseEntity<ApiResponse<PageResponse<FileLoadMetaDataResponse>>> getAllFileLoadsPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size);
+
     @GetMapping("/metrics")
     ResponseEntity<ApiResponse<DashboardMetricsResponse>> getDashboardMetrics();
+
+    @PostMapping("/errors/{id}/resolve")
+    ResponseEntity<ApiResponse<Void>> resolveError(@PathVariable("id") Long id);
+
+    @PostMapping("/errors/{id}/ignore")
+    ResponseEntity<ApiResponse<Void>> ignoreError(@PathVariable("id") Long id);
 }

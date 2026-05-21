@@ -4,6 +4,7 @@ import com.mphasis.tse.entity.TradeTransaction;
 import com.mphasis.tse.entity.TradeWrapper;
 import com.mphasis.tse.entity.TransactionError;
 import com.mphasis.tse.entity.TransactionRegistry;
+import com.mphasis.tse.entity.User;
 
 import com.mphasis.tse.enums.ErrorStatus;
 import com.mphasis.tse.repository.TransactionErrorRepository;
@@ -50,7 +51,7 @@ public class TradeItemWriter implements ItemWriter<TradeWrapper> {
 
 
     @Override
-    public void write(Chunk<? extends TradeWrapper> chunk) {
+    public synchronized void write(Chunk<? extends TradeWrapper> chunk) {
 
         log.info("Starting write() with {} records in chunk", chunk.size());
 
@@ -65,7 +66,8 @@ public class TradeItemWriter implements ItemWriter<TradeWrapper> {
             if (wrapper.getTradeTransaction() != null) {
                 TradeTransaction transaction = wrapper.getTradeTransaction();
                 successList.add(transaction);
-                registryList.add(new TransactionRegistry(transaction.getTransactionId()));
+                User user = (transaction.getMetaData() != null) ? transaction.getMetaData().getUser() : null;
+                registryList.add(new TransactionRegistry(transaction.getTransactionId(), user));
                 successTransactionIds.add(transaction.getTransactionId());
                 log.debug("Processed successful transactionId={}", transaction.getTransactionId());
             }
@@ -84,16 +86,41 @@ public class TradeItemWriter implements ItemWriter<TradeWrapper> {
 
         if (!registryList.isEmpty()) {
             log.info("Saving {} registry records", registryList.size());
-            transactionErrorRepository.updateStatusByTransactionIds(
+            transactionErrorRepository.updateStatusByTransactionIdsAndUserId(
                     successTransactionIds,
-                    ErrorStatus.RESOLVED
+                    ErrorStatus.RESOLVED,
+                    ownerUserId(successList.get(0).getMetaData())
             );
             transactionRegistryRepository.saveAll(registryList);
         }
 
         if (!errorList.isEmpty()) {
-            log.info("Saving {} error records", errorList.size());
-            transactionErrorRepository.saveAll(errorList);
+            log.info("Saving {} error records with fingerprint de-duplication", errorList.size());
+            List<TransactionError> toSave = new ArrayList<>();
+            for (TransactionError err : errorList) {
+                if (err.getStatus() == ErrorStatus.FAILED || err.getStatus() == ErrorStatus.INVALID_TRANSACTION_ID) {
+                    List<TransactionError> existing = transactionErrorRepository.findExistingActiveErrorForUser(
+                            err.getTransactionId(),
+                            err.getErrorField(),
+                            err.getErrorMessage(),
+                            err.getStatus(),
+                            ownerUserId(err.getMetaData())
+                    );
+                    if (!existing.isEmpty()) {
+                        TransactionError existingErr = existing.get(0);
+                        existingErr.setMetaData(err.getMetaData());
+                        existingErr.setRowNumber(err.getRowNumber());
+                        existingErr.setAccountNumber(err.getAccountNumber());
+                        existingErr.setCreatedTime(java.time.LocalDateTime.now());
+                        toSave.add(existingErr);
+                        log.info("Fingerprint match found! Updated existing error record id={} with status={} to new fileId={} and rowNumber={}",
+                                existingErr.getErrorId(), err.getStatus(), err.getMetaData().getFileId(), err.getRowNumber());
+                        continue;
+                    }
+                }
+                toSave.add(err);
+            }
+            transactionErrorRepository.saveAll(toSave);
         }
 
         ExecutionContext context = stepExecution.getJobExecution().getExecutionContext();
@@ -107,6 +134,10 @@ public class TradeItemWriter implements ItemWriter<TradeWrapper> {
         log.info("Updated errorCount from {} to {}", errorCount, errorCount + error);
 
         log.info("write() completed");
+    }
+
+    private Long ownerUserId(com.mphasis.tse.entity.FileLoadMetaData metaData) {
+        return metaData != null && metaData.getUser() != null ? metaData.getUser().getId() : null;
     }
 }
 

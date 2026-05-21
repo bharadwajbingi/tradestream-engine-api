@@ -10,7 +10,7 @@ import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.infrastructure.item.ExecutionContext;
-import org.springframework.batch.infrastructure.item.file.FlatFileItemReader;
+import org.springframework.batch.infrastructure.item.ItemStreamReader;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -41,15 +41,16 @@ class TradeBatchConfigTest {
                 "header1,header2,header3",
                 "A,B,C"
                 ));
-        FlatFileItemReader<String[]> reader =
+        ItemStreamReader<String[]> reader =
                 config.transactionReader(tempFile.getAbsolutePath());
         reader.open(new ExecutionContext());
         String[] result = reader.read();
         assertNotNull(result);
-        assertEquals(3, result.length);
+        assertEquals(22, result.length);
         assertEquals("A", result[0]);
         assertEquals("B", result[1]);
         assertEquals("C", result[2]);
+        assertEquals("2", result[21]);
         reader.close();
     }
 
@@ -58,8 +59,8 @@ class TradeBatchConfigTest {
         JobRepository jobRepository = mock(JobRepository.class);
         PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
         AsyncTaskExecutor taskExecutor = mock(AsyncTaskExecutor.class);
-        FlatFileItemReader<String[]> reader =
-                mock(FlatFileItemReader.class);
+        ItemStreamReader<String[]> reader =
+                mock(ItemStreamReader.class);
         Step step = config.tradeProcessingStep(
                 jobRepository,
                 transactionManager,

@@ -11,6 +11,8 @@ import java.util.List;
 public interface FileLoadMetaDataMapper {
 
     @Mapping(source = "fileId", target = "id")
+    @Mapping(source = "fileId", target = "fileId")
+    @Mapping(source = "user.id", target = "userId")
     @Mapping(target = "status", expression = "java(fileLoadMetaData.getStatus() != null ? fileLoadMetaData.getStatus().name() : null)")
     FileLoadMetaDataResponse toResponse(FileLoadMetaData fileLoadMetaData);
 

@@ -13,10 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -46,6 +43,17 @@ public class FileControllerImpl implements IFileController {
     }
 
     @Override
+    public ResponseEntity<ApiResponse<PageResponse<TransactionErrorResponse>>> getAllErrorsPage(int page, int size) {
+        PageResponse<TransactionErrorResponse> errors = fileService.getAllErrorsPage(page, size);
+        return ResponseEntity.ok(new ApiResponse<>(
+                HttpStatus.OK.name(),
+                HttpStatus.OK.value(),
+                "Errors retrieved successfully",
+                errors
+        ));
+    }
+
+    @Override
     public ResponseEntity<ApiResponse<DashboardMetricsResponse>> getDashboardMetrics() {
 
         log.debug("GET /file/metrics");
@@ -65,7 +73,7 @@ public class FileControllerImpl implements IFileController {
 
     @Override
     public ResponseEntity<ApiResponse<List<FileLoadMetaDataResponse>>> searchFiles(
-             FileSearchRequest request) {
+             @RequestBody FileSearchRequest request) {
 
         log.info("Search Files started");
 
@@ -80,10 +88,22 @@ public class FileControllerImpl implements IFileController {
         );
     }
 
+    @Override
+    public ResponseEntity<ApiResponse<PageResponse<FileLoadMetaDataResponse>>> searchFilesPage(
+            @RequestBody FileSearchRequest request) {
+        PageResponse<FileLoadMetaDataResponse> response = fileService.searchFileLoadsPage(request);
+        return ResponseEntity.ok(
+                new ApiResponse<>(HttpStatus.OK.name(),
+                        HttpStatus.OK.value(),
+                        "Files retrieved successfully",
+                        response)
+        );
+    }
+
 
     @Override
     public ResponseEntity<ApiResponse<List<TransactionErrorResponse>>> searchFileErrors(
-             TransactionErrorSearchRequest request) {
+             @RequestBody TransactionErrorSearchRequest request) {
         log.info("Search File Errors started");
 
         List<TransactionErrorResponse> response = fileService.searchFileErrors(request);
@@ -98,11 +118,25 @@ public class FileControllerImpl implements IFileController {
         );
     }
 
+    @Override
+    public ResponseEntity<ApiResponse<PageResponse<TransactionErrorResponse>>> searchFileErrorsPage(
+            @RequestBody TransactionErrorSearchRequest request) {
+        PageResponse<TransactionErrorResponse> response = fileService.searchFileErrorsPage(request);
+        return ResponseEntity.ok(
+                new ApiResponse<>(
+                        HttpStatus.OK.name(),
+                        HttpStatus.OK.value(),
+                        "File errors retrieved successfully",
+                        response
+                )
+        );
+    }
+
 
 
     @Override
     public ResponseEntity<ApiResponse<FileLoadMetaDataResponse>> modifyFileLoadStatus(
-             FileLoadMetaData request) {
+             @RequestBody FileLoadMetaData request) {
 
         log.info("Modify request received for id={}, newStatus={}",
                 request.getFileId(), request.getStatus());
@@ -123,7 +157,7 @@ public class FileControllerImpl implements IFileController {
 
 
     @Override
-    public ResponseEntity<ApiResponse<Void>> deleteFileLoad(Long id) {
+    public ResponseEntity<ApiResponse<Void>> deleteFileLoad(@PathVariable("id") Long id) {
 
         log.info("Delete request received for id={}", id);
         fileService.deleteFileLoad(id);
@@ -139,7 +173,7 @@ public class FileControllerImpl implements IFileController {
     }
 
     @Override
-    public ResponseEntity<ApiResponse<Void>> archiveFileLoad( Long id) {
+    public ResponseEntity<ApiResponse<Void>> archiveFileLoad(@PathVariable("id") Long id) {
         log.info("Archive request received for id={}", id);
         fileService.archiveFileLoad(id);
         log.info("Archive completed for id={}",id );
@@ -187,5 +221,44 @@ public class FileControllerImpl implements IFileController {
         );
     }
 
+    @Override
+    public ResponseEntity<ApiResponse<PageResponse<FileLoadMetaDataResponse>>> getAllFileLoadsPage(int page, int size) {
+        PageResponse<FileLoadMetaDataResponse> response = fileService.getAllFileLoadsPage(page, size);
+        return ResponseEntity.ok(
+                new ApiResponse<>(
+                        HttpStatus.OK.name(),
+                        HttpStatus.OK.value(),
+                        "File loads retrieved successfully",
+                        response
+                )
+        );
+    }
 
+    @Override
+    public ResponseEntity<ApiResponse<Void>> resolveError(@PathVariable("id") Long id) {
+        log.info("POST /file/errors/{}/resolve", id);
+        fileService.resolveErrorManual(id);
+        return ResponseEntity.ok(
+                new ApiResponse<>(
+                        HttpStatus.OK.name(),
+                        HttpStatus.OK.value(),
+                        "Error resolved successfully",
+                        null
+                )
+        );
+    }
+
+    @Override
+    public ResponseEntity<ApiResponse<Void>> ignoreError(@PathVariable("id") Long id) {
+        log.info("POST /file/errors/{}/ignore", id);
+        fileService.ignoreErrorManual(id);
+        return ResponseEntity.ok(
+                new ApiResponse<>(
+                        HttpStatus.OK.name(),
+                        HttpStatus.OK.value(),
+                        "Error ignored successfully",
+                        null
+                )
+        );
+    }
 }

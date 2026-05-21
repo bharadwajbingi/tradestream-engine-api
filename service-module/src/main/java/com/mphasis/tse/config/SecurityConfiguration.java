@@ -1,6 +1,8 @@
 package com.mphasis.tse.config;
 
 import com.mphasis.tse.filter.JwtAuthenticationFilter;
+import com.mphasis.tse.filter.ExportTokenFilter;
+import com.mphasis.tse.config.oauth2.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.*;
 import org.springframework.security.config.Customizer;
@@ -21,9 +23,11 @@ public class SecurityConfiguration {
 
     private final JwtAuthenticationFilter jwtFilter;
     private final AuthenticationProvider authProvider;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final ExportTokenFilter exportTokenFilter;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http){
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
                 .cors(Customizer.withDefaults())
@@ -33,27 +37,33 @@ public class SecurityConfiguration {
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                "/webjars/**",
+                                "/error"
                         ).permitAll()
-                        .requestMatchers("/file/upload").permitAll()
-                        .requestMatchers("/file/search").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/info", "/health").permitAll()
+                        .requestMatchers("/file/**").authenticated()
+                        .requestMatchers("/transactions/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sess ->
                         sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authenticationProvider(authProvider)
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(oAuth2SuccessHandler)
+                )
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(exportTokenFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }
-
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
 
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:4200"));
+        config.setAllowedOrigins(List.of("http://localhost:4200", "http://localhost:5173", "http://localhost:5174","https://d2i9y8go17l95q.cloudfront.net"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

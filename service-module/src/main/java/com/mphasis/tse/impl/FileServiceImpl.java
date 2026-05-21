@@ -3,6 +3,7 @@ package com.mphasis.tse.impl;
 import com.mphasis.tse.dto.*;
 import com.mphasis.tse.entity.FileLoadMetaData;
 import com.mphasis.tse.entity.TransactionError;
+import com.mphasis.tse.entity.User;
 import com.mphasis.tse.enums.ErrorStatus;
 import com.mphasis.tse.enums.FileStatus;
 import com.mphasis.tse.exception.EmptyFileException;
@@ -14,6 +15,9 @@ import com.mphasis.tse.repository.TradeArchiveRepository;
 import com.mphasis.tse.repository.TransactionErrorRepository;
 import com.mphasis.tse.repository.TransactionMainTableRepository;
 import com.mphasis.tse.repository.TransactionMetaTableRepository;
+import com.mphasis.tse.repository.DeletedTradeTransactionRepository;
+import com.mphasis.tse.repository.DeletedTransactionErrorRepository;
+import com.mphasis.tse.repository.UserRepository;
 import com.mphasis.tse.service.IFileService;
 import com.mphasis.tse.service.async.AsyncProcessingService;
 import com.mphasis.tse.specification.FileLoadSpecification;
@@ -26,6 +30,11 @@ import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -56,7 +65,13 @@ public class FileServiceImpl implements IFileService {
 
     private final TradeArchiveRepository tradeArchiveRepository;
 
+    private final DeletedTradeTransactionRepository deletedTradeTransactionRepository;
+    private final DeletedTransactionErrorRepository deletedTransactionErrorRepository;
+    private final UserRepository userRepository;
+
     public FileServiceImpl(TransactionMetaTableRepository transactionMetaTableRepository, TransactionErrorRepository transactionErrorRepository, AsyncProcessingService asyncProcessingService, TransactionMainTableRepository transactionMainTableRepository, TradeArchiveRepository tradeArchiveRepository,
+                           DeletedTradeTransactionRepository deletedTradeTransactionRepository, DeletedTransactionErrorRepository deletedTransactionErrorRepository,
+                           UserRepository userRepository,
                            @Qualifier("tradeFileProcessingJob") Job job, TransactionErrorMapper transactionErrorMapper, FileLoadMetaDataMapper fileLoadMetaDataMapper, TransactionMetaTableRepository repository,@Value("${file.upload.temp-dir}") String tempDir) {
 
         this.transactionMetaTableRepository = transactionMetaTableRepository;
@@ -64,6 +79,9 @@ public class FileServiceImpl implements IFileService {
         this.asyncProcessingService = asyncProcessingService;
         this.transactionMainTableRepository = transactionMainTableRepository;
         this.tradeArchiveRepository = tradeArchiveRepository;
+        this.deletedTradeTransactionRepository = deletedTradeTransactionRepository;
+        this.deletedTransactionErrorRepository = deletedTransactionErrorRepository;
+        this.userRepository = userRepository;
         this.job = job;
         this.transactionErrorMapper = transactionErrorMapper;
         this.fileLoadMetaDataMapper = fileLoadMetaDataMapper;
@@ -74,14 +92,27 @@ public class FileServiceImpl implements IFileService {
     @Override
     public List<TransactionErrorResponse> getAllErrors() {
         log.debug("Fetching all transaction errors");
-        List<TransactionError> errors = transactionErrorRepository.findAll();
+        java.util.Optional<Long> userId = currentUserId();
+        List<TransactionError> errors = userId.isPresent()
+                ? transactionErrorRepository.findAll(ownedErrorSpec())
+                : transactionErrorRepository.findAll();
         return transactionErrorMapper.toDtoList(errors);
+    }
+
+    @Override
+    public PageResponse<TransactionErrorResponse> getAllErrorsPage(int page, int size) {
+        var pageable = PageRequest.of(normalizePage(page), normalizeSize(size), Sort.by(Sort.Direction.DESC, "createdTime"));
+        return PageResponse.from(
+                transactionErrorRepository.findAll(ownedErrorSpec(), pageable)
+                        .map(transactionErrorMapper::toDto)
+        );
     }
 
 
     public List<FileLoadMetaDataResponse> searchFileLoads(FileSearchRequest request) {
-        Specification<FileLoadMetaData> spec =
-                Specification.where(Specification.unrestricted());
+        Specification<FileLoadMetaData> spec = ownedFileSpec().and(
+                (root, query, cb) -> cb.or(cb.isNull(root.get("isDeleted")), cb.equal(root.get("isDeleted"), false))
+        );
         if (request.getFileId() != null) {
             spec = spec.and(
                     FileLoadSpecification.hasFileId(request.getFileId())
@@ -110,13 +141,39 @@ public class FileServiceImpl implements IFileService {
     }
 
     @Override
+    public PageResponse<FileLoadMetaDataResponse> searchFileLoadsPage(FileSearchRequest request) {
+        Specification<FileLoadMetaData> spec = buildFileSearchSpec(request);
+        var pageable = PageRequest.of(
+                normalizePage(request.getPage()),
+                normalizeSize(request.getSize()),
+                Sort.by(Sort.Direction.DESC, "uploadTime")
+        );
+        return PageResponse.from(
+                transactionMetaTableRepository.findAll(spec, pageable)
+                        .map(fileLoadMetaDataMapper::toResponse)
+        );
+    }
+
+    @Override
     public DashboardMetricsResponse getMetrics() {
         log.debug("Fetching dashboard summary metrics");
 
-        long totalFiles = transactionMetaTableRepository.count();
-        long successRecords = transactionMainTableRepository.count();
-        long errorRecords =
-                transactionErrorRepository.countDistinctByStatus(ErrorStatus.FAILED);
+        java.util.Optional<Long> userId = currentUserId();
+        long totalFiles;
+        long successRecords;
+        long errorRecords;
+
+        if (userId.isPresent()) {
+            List<Long> fileIds = transactionMetaTableRepository.findActiveFileIdsByUserId(userId.get());
+            totalFiles = transactionMetaTableRepository.countActiveFilesByUserId(userId.get());
+            successRecords = transactionMainTableRepository.countByUserId(userId.get())
+                    + (fileIds.isEmpty() ? 0 : tradeArchiveRepository.countByFileIdIn(fileIds));
+            errorRecords = transactionErrorRepository.countDistinctByStatusAndUserId(ErrorStatus.FAILED, userId.get());
+        } else {
+            totalFiles = transactionMetaTableRepository.countActiveFiles();
+            successRecords = transactionMainTableRepository.count() + tradeArchiveRepository.count();
+            errorRecords = transactionErrorRepository.countDistinctByStatus(ErrorStatus.FAILED);
+        }
 
         return new DashboardMetricsResponse(totalFiles, successRecords, errorRecords);
     }
@@ -124,7 +181,7 @@ public class FileServiceImpl implements IFileService {
 
     public List<TransactionErrorResponse> searchFileErrors(TransactionErrorSearchRequest request) {
         Specification<TransactionError> spec =
-                Specification.where(Specification.unrestricted());
+                Specification.where(ownedErrorSpec());
         if (request.getFileLoadId() != null) {
             spec = spec.and(
                     TransactionErrorSpecification.hasFileLoadId(request.getFileLoadId())
@@ -152,9 +209,29 @@ public class FileServiceImpl implements IFileService {
                     TransactionErrorSpecification.hasStatus(statusEnum)
             );
 
+        } else {
+            // Exclude IGNORED and DUPLICATE status by default when listing/searching
+            spec = spec.and((root, query, cb) -> cb.and(
+                cb.notEqual(root.get("status"), ErrorStatus.IGNORED),
+                cb.notEqual(root.get("status"), ErrorStatus.DUPLICATE)
+            ));
         }
         List<TransactionError> result = transactionErrorRepository.findAll(spec);
         return transactionErrorMapper.toDtoList(result);
+    }
+
+    @Override
+    public PageResponse<TransactionErrorResponse> searchFileErrorsPage(TransactionErrorSearchRequest request) {
+        Specification<TransactionError> spec = buildErrorSearchSpec(request);
+        var pageable = PageRequest.of(
+                normalizePage(request.getPage()),
+                normalizeSize(request.getSize()),
+                Sort.by(Sort.Direction.DESC, "createdTime")
+        );
+        return PageResponse.from(
+                transactionErrorRepository.findAll(spec, pageable)
+                        .map(transactionErrorMapper::toDto)
+        );
     }
 
 
@@ -162,8 +239,7 @@ public class FileServiceImpl implements IFileService {
     public FileLoadMetaDataResponse modifyFileLoadStatus(FileLoadMetaData request) {
         log.info("Modify started for id={} with newStatus={}",
                 request.getFileId(), request.getStatus());
-        FileLoadMetaData entity = transactionMetaTableRepository.findById(request.getFileId())
-                .orElseThrow(() -> new RuntimeException("File not found for id " + request.getFileId()));
+        FileLoadMetaData entity = findAccessibleFileLoad(request.getFileId());
         entity.setStatus(request.getStatus());
         FileLoadMetaData saved = transactionMetaTableRepository.save(entity);
         log.info("Modify completed for id={} finalStatus={}",
@@ -173,12 +249,36 @@ public class FileServiceImpl implements IFileService {
 
 
     @Override
+    @Transactional
     public void deleteFileLoad(Long id) {
         log.info("Delete File Load started for id: {}", id);
 
-        FileLoadMetaData metaData = transactionMetaTableRepository.findById(id)
-                .orElseThrow(() -> new FileNotFoundException("File not found for id " + id));
+        FileLoadMetaData metaData = findAccessibleFileLoad(id);
+
+        LocalDateTime deletedAt = LocalDateTime.now();
+
+        // 1. Move related active transactions to deleted table
+        deletedTradeTransactionRepository.moveByFileId(id, deletedAt);
+
+        // 2. Move related archived transactions to deleted table
+        deletedTradeTransactionRepository.moveFromArchiveByFileId(id, deletedAt);
+
+        // 3. Move transaction errors to deleted table
+        deletedTransactionErrorRepository.moveByFileId(id, deletedAt);
+
+        // 4. Delete original trade transactions
+        transactionMainTableRepository.deleteByFileId(id);
+
+        // 5. Delete original trade archive records
+        tradeArchiveRepository.deleteByFileId(id);
+
+        // 6. Delete original transaction errors
+        transactionErrorRepository.deleteByFileId(id);
+
+        // 7. Update file load metadata
         metaData.setStatus(FileStatus.DELETED);
+        metaData.setIsDeleted(true);
+        metaData.setDeletedAt(deletedAt);
         transactionMetaTableRepository.save(metaData);
         log.info("Delete File Load completed for id: {}", id);
     }
@@ -189,8 +289,7 @@ public class FileServiceImpl implements IFileService {
 
         log.info("Archive File Load started for id: {}", fileId);
 
-        FileLoadMetaData metaData = transactionMetaTableRepository.findById(fileId)
-                .orElseThrow(() -> new RuntimeException("File not found"));
+        FileLoadMetaData metaData = findAccessibleFileLoad(fileId);
 
         tradeArchiveRepository.archiveByFileId(fileId);
 
@@ -270,6 +369,7 @@ public class FileServiceImpl implements IFileService {
         metaData.setFilename(file.getOriginalFilename());
         metaData.setUploadTime(LocalDateTime.now());
         metaData.setStatus(FileStatus.STARTED);
+        currentUser().ifPresent(metaData::setUser);
         return transactionMetaTableRepository.save(metaData);
     }
 
@@ -288,8 +388,191 @@ public class FileServiceImpl implements IFileService {
 
         log.info("Fetching all file loads");
 
-        return repository.findAll().stream()
-                .filter(file -> file.getStatus() != FileStatus.ARCHIVED && file.getStatus() != FileStatus.DELETED) //  only SUCCESS
+        List<FileLoadMetaData> files = currentUserId().isPresent()
+                ? repository.findAll(ownedFileSpec())
+                : repository.findAll();
+
+        return files.stream()
+                .filter(file -> file.getStatus() != FileStatus.DELETED
+                        && (file.getIsDeleted() == null || !file.getIsDeleted())) // only ACTIVE and ARCHIVED
                 .toList();
+    }
+
+    @Override
+    public PageResponse<FileLoadMetaDataResponse> getAllFileLoadsPage(int page, int size) {
+        Specification<FileLoadMetaData> spec = ownedFileSpec().and(
+                (root, query, cb) -> cb.and(
+                        cb.notEqual(root.get("status"), FileStatus.DELETED),
+                        cb.or(cb.isNull(root.get("isDeleted")), cb.equal(root.get("isDeleted"), false))
+                )
+        );
+        var pageable = PageRequest.of(normalizePage(page), normalizeSize(size), Sort.by(Sort.Direction.DESC, "uploadTime"));
+        return PageResponse.from(
+                transactionMetaTableRepository.findAll(spec, pageable)
+                        .map(fileLoadMetaDataMapper::toResponse)
+        );
+    }
+
+    @Override
+    @Transactional
+    public void resolveErrorManual(Long errorId) {
+        log.info("Manually resolving errorId: {}", errorId);
+        TransactionError error = transactionErrorRepository.findById(errorId)
+                .orElseThrow(() -> new RuntimeException("Error record not found for id " + errorId));
+        assertErrorAccess(error);
+        if (error.getMetaData() != null && error.getMetaData().getStatus() == FileStatus.ARCHIVED) {
+            throw new RuntimeException("Cannot modify errors of an archived file");
+        }
+        error.setStatus(ErrorStatus.RESOLVED);
+        transactionErrorRepository.save(error);
+
+        if (error.getMetaData() != null) {
+            recalculateFileCompletion(error.getMetaData().getFileId());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void ignoreErrorManual(Long errorId) {
+        log.info("Manually ignoring errorId: {}", errorId);
+        TransactionError error = transactionErrorRepository.findById(errorId)
+                .orElseThrow(() -> new RuntimeException("Error record not found for id " + errorId));
+        assertErrorAccess(error);
+        if (error.getMetaData() != null && error.getMetaData().getStatus() == FileStatus.ARCHIVED) {
+            throw new RuntimeException("Cannot modify errors of an archived file");
+        }
+        if (error.getStatus() != ErrorStatus.INVALID_TRANSACTION_ID) {
+            throw new RuntimeException("Only invalid transaction ID errors can be ignored manually");
+        }
+        error.setStatus(ErrorStatus.IGNORED);
+        transactionErrorRepository.save(error);
+
+        if (error.getMetaData() != null) {
+            recalculateFileCompletion(error.getMetaData().getFileId());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void recalculateFileCompletion(Long fileId) {
+        log.info("Recalculating completion for fileId: {}", fileId);
+        FileLoadMetaData meta = transactionMetaTableRepository.findById(fileId)
+                .orElseThrow(() -> new RuntimeException("File metadata not found for id " + fileId));
+
+        long activeErrors = transactionErrorRepository.countByMetaData_FileIdAndStatusIn(
+                fileId,
+                List.of(ErrorStatus.FAILED, ErrorStatus.INVALID_TRANSACTION_ID)
+        );
+        if (activeErrors > 0) {
+            meta.setStatus(FileStatus.COMPLETED_WITH_ERROR);
+        } else {
+            meta.setStatus(FileStatus.COMPLETED);
+        }
+        transactionMetaTableRepository.save(meta);
+        log.info("Updated fileId={} status to {}", fileId, meta.getStatus());
+    }
+
+    private java.util.Optional<User> currentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
+            return java.util.Optional.empty();
+        }
+        return userRepository.findByEmail(authentication.getName());
+    }
+
+    private java.util.Optional<Long> currentUserId() {
+        return currentUser().map(User::getId);
+    }
+
+    private Specification<FileLoadMetaData> ownedFileSpec() {
+        return currentUserId()
+                .<Specification<FileLoadMetaData>>map(FileLoadSpecification::belongsToUser)
+                .orElse(Specification.unrestricted());
+    }
+
+    private Specification<TransactionError> ownedErrorSpec() {
+        return currentUserId()
+                .<Specification<TransactionError>>map(TransactionErrorSpecification::belongsToUser)
+                .orElse(Specification.unrestricted());
+    }
+
+    private FileLoadMetaData findAccessibleFileLoad(Long fileId) {
+        FileLoadMetaData metaData = transactionMetaTableRepository.findById(fileId)
+                .orElseThrow(() -> new FileNotFoundException("File not found for id " + fileId));
+        currentUserId().ifPresent(userId -> {
+            Long ownerId = metaData.getUser() != null ? metaData.getUser().getId() : null;
+            if (!userId.equals(ownerId)) {
+                throw new AccessDeniedException("You do not have access to file id " + fileId);
+            }
+        });
+        return metaData;
+    }
+
+    private void assertErrorAccess(TransactionError error) {
+        currentUserId().ifPresent(userId -> {
+            Long ownerId = error.getMetaData() != null && error.getMetaData().getUser() != null
+                    ? error.getMetaData().getUser().getId()
+                    : null;
+            if (!userId.equals(ownerId)) {
+                throw new AccessDeniedException("You do not have access to error id " + error.getErrorId());
+            }
+        });
+    }
+
+    private Specification<FileLoadMetaData> buildFileSearchSpec(FileSearchRequest request) {
+        Specification<FileLoadMetaData> spec = ownedFileSpec().and(
+                (root, query, cb) -> cb.or(cb.isNull(root.get("isDeleted")), cb.equal(root.get("isDeleted"), false))
+        );
+        if (request.getFileId() != null) {
+            spec = spec.and(FileLoadSpecification.hasFileId(request.getFileId()));
+        }
+        if (request.getFilename() != null) {
+            spec = spec.and(FileLoadSpecification.hasFilename(request.getFilename()));
+        }
+        if (request.getStatus() != null) {
+            spec = spec.and(FileLoadSpecification.hasStatus(request.getStatus()));
+        }
+        if (request.getStartDate() != null && request.getEndDate() != null) {
+            spec = spec.and(FileLoadSpecification.hasUploadTimeBetween(request.getStartDate(), request.getEndDate()));
+        }
+        return spec;
+    }
+
+    private Specification<TransactionError> buildErrorSearchSpec(TransactionErrorSearchRequest request) {
+        Specification<TransactionError> spec = Specification.where(ownedErrorSpec());
+        if (request.getFileLoadId() != null) {
+            spec = spec.and(TransactionErrorSpecification.hasFileLoadId(request.getFileLoadId()));
+        }
+        if (request.getTransactionId() != null) {
+            spec = spec.and(TransactionErrorSpecification.hasTransactionId(request.getTransactionId()));
+        }
+        if (request.getAccountNumber() != null) {
+            spec = spec.and(TransactionErrorSpecification.hasAccountNumber(request.getAccountNumber()));
+        }
+        if (request.getErrorField() != null) {
+            spec = spec.and(TransactionErrorSpecification.hasErrorField(request.getErrorField()));
+        }
+        if (request.getStatus() != null) {
+            ErrorStatus statusEnum = ErrorStatus.valueOf(request.getStatus().toUpperCase());
+            spec = spec.and(TransactionErrorSpecification.hasStatus(statusEnum));
+        } else {
+            spec = spec.and((root, query, cb) -> cb.and(
+                    cb.notEqual(root.get("status"), ErrorStatus.IGNORED),
+                    cb.notEqual(root.get("status"), ErrorStatus.DUPLICATE)
+            ));
+        }
+        return spec;
+    }
+
+    private int normalizePage(Integer page) {
+        return page == null || page < 0 ? 0 : page;
+    }
+
+    private int normalizeSize(Integer size) {
+        if (size == null || size < 1) {
+            return 20;
+        }
+        return Math.min(size, 100);
     }
 }

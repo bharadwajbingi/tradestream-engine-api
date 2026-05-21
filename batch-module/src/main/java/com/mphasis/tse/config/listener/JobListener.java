@@ -4,7 +4,8 @@ import com.mphasis.tse.entity.FileLoadMetaData;
 import com.mphasis.tse.enums.FileStatus;
 import com.mphasis.tse.exception.FileNotFoundException;
 import com.mphasis.tse.repository.TransactionMetaTableRepository;
-import lombok.Getter;
+import com.mphasis.tse.repository.TransactionErrorRepository;
+import com.mphasis.tse.enums.ErrorStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.JobExecution;
@@ -14,33 +15,29 @@ import org.springframework.batch.infrastructure.item.ExecutionContext;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
-@Getter
 @Component
 public class JobListener implements JobExecutionListener {
 
     private final TransactionMetaTableRepository transactionMetaTableRepository;
+    private final TransactionErrorRepository transactionErrorRepository;
 
-    private FileLoadMetaData fileLoadMetaData;
-    private Set<String> seenTransactionIds;
-
-    public JobListener(TransactionMetaTableRepository transactionMetaTableRepository) {
+    public JobListener(TransactionMetaTableRepository transactionMetaTableRepository,
+                       TransactionErrorRepository transactionErrorRepository) {
         this.transactionMetaTableRepository = transactionMetaTableRepository;
+        this.transactionErrorRepository = transactionErrorRepository;
     }
 
     @Override
     public void beforeJob(JobExecution jobExecution) {
 
-        seenTransactionIds = ConcurrentHashMap.newKeySet();
         Long metaId = jobExecution.getJobParameters().getLong("fileMetaId");
 
         if (metaId == null) {
             throw new FileNotFoundException("metaId is required for job execution");
         }
 
-        fileLoadMetaData = transactionMetaTableRepository.findById(metaId)
+        FileLoadMetaData fileLoadMetaData = transactionMetaTableRepository.findById(metaId)
                 .orElseThrow(() -> new FileNotFoundException("File metadata not found for id: " + metaId));
 
         fileLoadMetaData.setStatus(FileStatus.PROCESSING);
@@ -60,7 +57,7 @@ public class JobListener implements JobExecutionListener {
             }
 
             log.info("metaId found: {}", metaId);
-            fileLoadMetaData = transactionMetaTableRepository.findById(metaId)
+            FileLoadMetaData fileLoadMetaData = transactionMetaTableRepository.findById(metaId)
                     .orElseThrow(() -> {
                         log.error("File metadata not found for id: {}", metaId);
                         return new FileNotFoundException("File metadata not found for id: " + metaId);
@@ -83,16 +80,19 @@ public class JobListener implements JobExecutionListener {
 
             log.info("Total records read by step 'tradeProcessingStep': {}", readCount);
 
+            long activeErrors = transactionErrorRepository.countByMetaData_FileIdAndStatusIn(
+                    metaId,
+                    java.util.List.of(ErrorStatus.FAILED, ErrorStatus.INVALID_TRANSACTION_ID)
+            );
+
             if (jobExecution.getStatus().isUnsuccessful()) {
                 log.warn("Job failed with status: {}", jobExecution.getStatus());
                 fileLoadMetaData.setStatus(FileStatus.FAILED);
-
-            } else if (errorCount > 0) {
-                log.warn("Job completed with errors. errorCount={}", errorCount);
+            } else if (activeErrors > 0) {
+                log.warn("Job completed with errors. activeErrors={}", activeErrors);
                 fileLoadMetaData.setStatus(FileStatus.COMPLETED_WITH_ERROR);
-
-            } else if (jobExecution.getStatus() == BatchStatus.COMPLETED) {
-                log.info("Job completed successfully");
+            } else {
+                log.info("Job completed successfully with no active errors");
                 fileLoadMetaData.setStatus(FileStatus.COMPLETED);
             }
 

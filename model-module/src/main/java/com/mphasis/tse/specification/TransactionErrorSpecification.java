@@ -13,6 +13,11 @@ public class TransactionErrorSpecification {
                 cb.equal(root.get("metaData").get("fileId"), fileLoadId);
     }
 
+    public static Specification<TransactionError> belongsToUser(Long userId) {
+        return (root, query, cb) ->
+                cb.equal(root.get("metaData").get("user").get("id"), userId);
+    }
+
     public static Specification<TransactionError> hasTransactionId(String transactionId) {
         return (root, query, cb) ->
                 cb.equal(

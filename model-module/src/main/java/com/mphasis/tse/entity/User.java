@@ -22,7 +22,18 @@ public class User implements UserDetails {
 
     @Column(unique = true)
     private String email;
+    private String name;
     private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auth_provider")
+    private com.mphasis.tse.enums.AuthProvider authProvider = com.mphasis.tse.enums.AuthProvider.LOCAL;
+
+    @Column(name = "totp_secret")
+    private String totpSecret;
+
+    @Column(name = "totp_enabled")
+    private boolean totpEnabled = false;
 
     @Override
     public String getUsername() {

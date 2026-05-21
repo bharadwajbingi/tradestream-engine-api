@@ -19,4 +19,8 @@ public class TransactionErrorSearchRequest
 
     private String status;
 
+    private Integer page = 0;
+
+    private Integer size = 20;
+
 }

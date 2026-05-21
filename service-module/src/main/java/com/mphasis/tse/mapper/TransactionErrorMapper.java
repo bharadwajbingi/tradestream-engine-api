@@ -15,6 +15,8 @@ import java.util.List;
 public interface TransactionErrorMapper {
 
     @Mapping(source = "metaData.fileId", target = "fileId")
+    @Mapping(source = "metaData.filename", target = "filename")
+    @Mapping(source = "createdTime", target = "createdTime")
     TransactionErrorResponse toDto(TransactionError entity);
 
     List<TransactionErrorResponse> toDtoList(List<TransactionError> entities);

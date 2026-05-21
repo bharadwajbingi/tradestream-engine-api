@@ -18,6 +18,9 @@ public class TransactionErrorResponse {
     private String errorMessage;
     private String status;
     private Long fileId;
+    private Integer rowNumber;
+    private String filename;
+    private java.time.LocalDateTime createdTime;
 
 
 

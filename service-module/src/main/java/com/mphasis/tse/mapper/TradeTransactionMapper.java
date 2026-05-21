@@ -15,20 +15,28 @@ public interface TradeTransactionMapper {
         t.setBatchLocation(row[4]);
         t.setBatchNumber(Integer.valueOf(row[5]));
         t.setUpdateBatchDate(row[6]);
-        t.setRelatedFileNumber(Integer.valueOf(row[7]));
+        t.setRelatedFileNumber(toInteger(row[7]));
         t.setActionName(row[8]);
         t.setRelatedFileKey(Long.valueOf(row[9]));
         t.setDoNotReportFlag(row[10]);
         t.setExplanation(row[11]);
-        t.setMinorAssetsClass(Integer.valueOf(row[12]));
+        t.setMinorAssetsClass(toInteger(row[12]));
         t.setOwningPortfolio(Integer.valueOf(row[13]));
         t.setPosterInitials(row[14]);
         t.setTransactionSubtype(Integer.valueOf(row[15]));
         t.setCashEffect(new BigDecimal(row[16]));
-        t.setCashPaidOut(new BigDecimal(row[17]));
-        t.setBrokerNumber(Integer.valueOf(row[18]));
+        t.setCashPaidOut(toBigDecimal(row[17]));
+        t.setBrokerNumber(toInteger(row[18]));
         t.setOldBalance(new BigDecimal(row[19]));
         t.setNewBalance(new BigDecimal(row[20]));
         return t;
+    }
+
+    private static Integer toInteger(String value) {
+        return value == null || value.trim().isEmpty() ? null : Integer.valueOf(value.trim());
+    }
+
+    private static BigDecimal toBigDecimal(String value) {
+        return value == null || value.trim().isEmpty() ? null : new BigDecimal(value.trim());
     }
 }
