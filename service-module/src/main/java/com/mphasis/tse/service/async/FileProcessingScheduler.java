@@ -32,52 +32,53 @@ public class FileProcessingScheduler {
 
     @Scheduled(fixedDelayString = "${batch.scheduler.delay:5000}")
     public void processPendingFiles() {
-        // 1. Check current running jobs
-        long runningJobsCount = transactionMetaTableRepository.countByStatusIn(
-                List.of(FileStatus.STARTED, FileStatus.PROCESSING)
-        );
+        // 1. Get users with currently running jobs
+        List<Long> activeUserIds = transactionMetaTableRepository.findUsersWithActiveJobs();
+        java.util.Set<Long> processingUsers = new java.util.HashSet<>(activeUserIds);
 
-        if (runningJobsCount >= MAX_CONCURRENT_JOBS) {
-            log.trace("Max concurrent jobs ({}) reached. Waiting for next cycle.", MAX_CONCURRENT_JOBS);
+        // 2. Get all pending files
+        List<FileLoadMetaData> pendingFiles = transactionMetaTableRepository.findByStatusOrderByUploadTimeAsc(FileStatus.PENDING);
+
+        if (pendingFiles.isEmpty()) {
             return;
         }
 
-        // 2. Find oldest PENDING file
-        FileLoadMetaData pendingFile = transactionMetaTableRepository.findFirstByStatusOrderByUploadTimeAsc(FileStatus.PENDING);
-        
-        if (pendingFile == null) {
-            return; // No files to process
-        }
-
-        // 3. Mark as STARTED
-        pendingFile.setStatus(FileStatus.STARTED);
-        transactionMetaTableRepository.save(pendingFile);
-
-        log.info("Scheduler picked up fileId={} filename={} for processing", pendingFile.getFileId(), pendingFile.getFilename());
-
-        // 4. Launch Spring Batch Job
-        try {
-            // Using only fileMetaId ensures Spring Batch can resume a failed job since parameters match exactly
-            JobParameters jobParameters = new JobParametersBuilder()
-                    .addString("filePath", pendingFile.getFilePath())
-                    .addLong("fileMetaId", pendingFile.getFileId())
-                    .toJobParameters();
-
-            // Run job synchronously in this scheduler thread (since concurrency is 1, this blocks until done)
-            // Wait, if it runs synchronously, the @Scheduled task blocks until it finishes. This naturally enforces concurrency!
-            // But if JobLauncher is async (because of jobLauncherExecutor), it will return immediately.
-            // In Spring Batch, JobLauncher is synchronous by default unless configured otherwise.
-            // Our app defines a custom "jobLauncherExecutor" Async bean, but we use the default jobLauncher here?
-            // Actually, we can just use our existing AsyncProcessingService!
-            // Let's just use JobLauncher. If it's sync, great. If async, our DB check handles concurrency.
+        // 3. Process one pending file per user
+        for (FileLoadMetaData pendingFile : pendingFiles) {
+            if (pendingFile.getUser() == null) continue;
+            Long userId = pendingFile.getUser().getId();
             
-            JobExecution execution = jobLauncher.run(job, jobParameters);
-            log.info("Batch job launched. executionId={}, status={}", execution.getId(), execution.getStatus());
+            // If user is already processing a file, skip to next file
+            if (processingUsers.contains(userId)) {
+                continue;
+            }
 
-        } catch (Exception e) {
-            log.error("Failed to launch batch job for fileId={}", pendingFile.getFileId(), e);
-            pendingFile.setStatus(FileStatus.FAILED);
+            // Mark user as processing so we don't pick their second pending file
+            processingUsers.add(userId);
+
+            // Mark as STARTED
+            pendingFile.setStatus(FileStatus.STARTED);
             transactionMetaTableRepository.save(pendingFile);
+
+            log.info("Scheduler picked up fileId={} filename={} for user={} for processing", 
+                    pendingFile.getFileId(), pendingFile.getFilename(), userId);
+
+            // 4. Launch Spring Batch Job asynchronously if possible, or blocking scheduler
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    JobParameters jobParameters = new JobParametersBuilder()
+                            .addString("filePath", pendingFile.getFilePath())
+                            .addLong("fileMetaId", pendingFile.getFileId())
+                            .toJobParameters();
+                    
+                    JobExecution execution = jobLauncher.run(job, jobParameters);
+                    log.info("Batch job launched. executionId={}, status={}", execution.getId(), execution.getStatus());
+                } catch (Exception e) {
+                    log.error("Failed to launch batch job for fileId={}", pendingFile.getFileId(), e);
+                    pendingFile.setStatus(FileStatus.FAILED);
+                    transactionMetaTableRepository.save(pendingFile);
+                }
+            });
         }
     }
 }

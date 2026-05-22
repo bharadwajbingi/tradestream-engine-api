@@ -26,8 +26,11 @@ public interface TransactionMetaTableRepository
 
     long countByStatusIn(List<com.mphasis.tse.enums.FileStatus> statuses);
     
-    FileLoadMetaData findFirstByStatusOrderByUploadTimeAsc(com.mphasis.tse.enums.FileStatus status);
-    
+    @Query("SELECT DISTINCT f.user.id FROM FileLoadMetaData f WHERE f.status IN ('STARTED', 'PROCESSING')")
+    List<Long> findUsersWithActiveJobs();
+
+    List<FileLoadMetaData> findByStatusOrderByUploadTimeAsc(com.mphasis.tse.enums.FileStatus status);
+
     List<FileLoadMetaData> findByStatusIn(List<com.mphasis.tse.enums.FileStatus> statuses);
 }
 
