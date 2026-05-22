@@ -66,6 +66,7 @@ public class SecurityConfiguration {
         config.setAllowedOrigins(List.of("http://localhost:4200", "http://localhost:5173", "http://localhost:5174","https://d2i9y8go17l95q.cloudfront.net"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of("Content-Disposition"));
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
