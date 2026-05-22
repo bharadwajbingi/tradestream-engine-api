@@ -1,58 +1,72 @@
 spring:
   application:
     name: trade-file-processing-service
+
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/trade_db}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
+
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: false
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 5000
+        order_inserts: true
+        order_updates: true
+
   batch:
     job:
       enabled: false
     jdbc:
       initialize-schema: always
+
   servlet:
     multipart:
-      max-file-size: 50MB
-      max-request-size: 50MB
+      max-file-size: 1GB
+      max-request-size: 1GB
+
   security:
     oauth2:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID:mock-client-id}
-            client-secret: ${GOOGLE_CLIENT_SECRET:mock-client-secret}
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
             scope:
               - email
               - profile
-            redirect-uri: "{baseUrl}/login/oauth2/code/google"
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
 
 server:
   port: ${SERVER_PORT:8080}
 
 batch:
   trade:
-    chunk-size: ${BATCH_TRADE_CHUNK_SIZE:2000}
+    chunk-size: ${BATCH_TRADE_CHUNK_SIZE:5000}
 
 security:
   jwt:
     secret: ${JWT_SECRET:trade-stream-engine-dev-secret-change-me}
     expiration-time: ${JWT_EXPIRATION_MS:1800000}
+
   oauth2:
     frontend-redirect-url: ${FRONTEND_REDIRECT_URL:http://localhost:5173/oauth2/redirect}
+
   totp:
     encryption-key: ${TOTP_ENCRYPTION_KEY:my-super-secret-totp-encryption-key-32chars!}
 
 file:
   upload:
-    temp-dir: ${FILE_UPLOAD_TEMP_DIR:src/main/resources/temp-uploads/}
+    temp-dir: ${FILE_UPLOAD_TEMP_DIR:./data/uploads/}
 
 rate-limit:
   requests-per-minute: ${RATE_LIMIT_REQUESTS_PER_MINUTE:120}
@@ -63,6 +77,7 @@ management:
       base-path: /
       exposure:
         include: health,metrics,info
+
   endpoint:
     health:
       show-details: when_authorized
@@ -70,6 +85,7 @@ management:
 logging:
   pattern:
     level: "%5p [requestId:%X{requestId:-} jobId:%X{jobId:-}]"
+
   level:
     org.springframework.security: INFO
     org.hibernate.SQL: INFO

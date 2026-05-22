@@ -23,5 +23,11 @@ public interface TransactionMetaTableRepository
 
     @Query("SELECT f.fileId FROM FileLoadMetaData f WHERE f.user.id = :userId AND (f.isDeleted IS NULL OR f.isDeleted = false)")
     List<Long> findActiveFileIdsByUserId(@Param("userId") Long userId);
+
+    long countByStatusIn(List<com.mphasis.tse.enums.FileStatus> statuses);
+    
+    FileLoadMetaData findFirstByStatusOrderByUploadTimeAsc(com.mphasis.tse.enums.FileStatus status);
+    
+    List<FileLoadMetaData> findByStatusIn(List<com.mphasis.tse.enums.FileStatus> statuses);
 }
 

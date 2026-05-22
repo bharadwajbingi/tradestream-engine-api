@@ -46,15 +46,6 @@ class TradeRecordProcessorTest {
         when(transactionMetaTableRepository.findById(1L)).thenReturn(Optional.of(fileLoadMetaData));
     }
 
-    @Test
-    void testDuplicateInSystem() {
-        when(transactionMainTableRepository.existsByTransactionIdForOwner("TXN123", 42L))
-                .thenReturn(true);
-        TradeWrapper result = processor.process(row);
-        assertNotNull(result.getErrors());
-        assertFalse(result.getErrors().isEmpty());
-        assertEquals("Duplicate transaction in system success table", result.getErrors().get(0).getErrorMessage());
-    }
 
     @Test
     void testDuplicateInCurrentBatch() {

@@ -162,8 +162,7 @@ class FileServiceImplTest {
 
         FileUploadResponse res = fileService.uploadFile(file);
 
-        assertEquals("STARTED", res.getStatus());
-        verify(asyncService).process(any(), any());
+        assertEquals("PENDING", res.getStatus());
     }
 
     @Test
@@ -218,7 +217,7 @@ class FileServiceImplTest {
 
         FileUploadResponse res = fileService.uploadFile(file);
 
-        assertEquals("STARTED", res.getStatus());
+        assertEquals("PENDING", res.getStatus());
     }
 
 

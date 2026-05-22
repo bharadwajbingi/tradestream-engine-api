@@ -19,6 +19,7 @@ import org.springframework.batch.core.step.StepExecution;
 import org.springframework.batch.infrastructure.item.Chunk;
 import org.springframework.batch.infrastructure.item.ExecutionContext;
 
+
 import java.util.Collections;
 import java.util.List;
 
@@ -40,6 +41,12 @@ class TradeItemWriterTest {
     private ExecutionContext executionContext;
     @InjectMocks
     private TradeItemWriter writer;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        lenient().when(tradeTransactionRepository.findExistingTransactionIdsForOwner(any(), any()))
+                .thenReturn(Collections.emptyList());
+    }
 
 @Test
 void testWrite_withSuccessfulTransactions() {

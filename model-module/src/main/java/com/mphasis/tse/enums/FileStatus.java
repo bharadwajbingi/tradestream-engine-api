@@ -3,6 +3,7 @@ package com.mphasis.tse.enums;
 
 public enum FileStatus {
 
+    PENDING,
     STARTED,
     PROCESSING,
     COMPLETED,

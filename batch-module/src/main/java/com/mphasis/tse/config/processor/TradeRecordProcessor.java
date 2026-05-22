@@ -71,19 +71,6 @@ public class TradeRecordProcessor implements ItemProcessor<String[], TradeWrappe
             return wrapper;
         }
 
-        // 3. Duplicate check against trade_transaction table
-        Long userId = (metadata.getUser() != null) ? metadata.getUser().getId() : null;
-        boolean duplicateExists = transactionMainTableRepository.existsByTransactionIdForOwner(transactionId, userId);
-
-        if (duplicateExists) {
-            TransactionError error = buildError(metadata, recordTrackingId, transactionId, row,
-                    "transactionId",
-                    "Duplicate transaction in system success table",
-                    ErrorStatus.DUPLICATE,
-                    rowNumber);
-            wrapper.setErrors(List.of(error));
-            return wrapper;
-        }
 
         // 4. Duplicate check in the current batch seen IDs
         if (!seenTransactionIds.add(transactionId)) {

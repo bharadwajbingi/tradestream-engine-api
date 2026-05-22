@@ -280,8 +280,12 @@ public class FileServiceImpl implements IFileService {
         metaData.setIsDeleted(true);
         metaData.setDeletedAt(deletedAt);
         transactionMetaTableRepository.save(metaData);
+
+        // duplicate block removed
         log.info("Delete File Load completed for id: {}", id);
     }
+
+
 
     @Override
     @Transactional
@@ -303,30 +307,40 @@ public class FileServiceImpl implements IFileService {
 
 
 
+    private int countCsvRows(String filePath) {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(filePath))) {
+            int lines = 0;
+            while (reader.readLine() != null) {
+                lines++;
+            }
+            return lines > 0 ? lines - 1 : 0;
+        } catch (Exception e) {
+            log.error("Failed to count lines in CSV file: {}", filePath, e);
+            return 0;
+        }
+    }
+
     @Override
     public FileUploadResponse uploadFile(MultipartFile file) {
-
         try {
             validateFile(file);
 
-            String filePath = saveFileToDisk(file);
+            FileLoadMetaData metaData = saveInitialMetaData(file);
 
-            FileLoadMetaData metaData = saveMetaData(file);
-            Long fileMetaDataId = metaData.getFileId();
+            String filePath = saveFileToDisk(file, metaData.getFileId());
+            int totalRecords = countCsvRows(filePath);
+            
+            metaData.setFilePath(filePath);
+            metaData.setTotalRecords(totalRecords);
+            transactionMetaTableRepository.save(metaData);
 
-            JobParameters jobParameters = buildJobParameters(filePath, fileMetaDataId);
-
-            asyncProcessingService.process(job, jobParameters);
-
-            String fileName = file.getOriginalFilename() != null
-                    ? file.getOriginalFilename()
-                    : "unknown-file";
+            log.info("Counted {} rows in CSV file: {} saved at {}", totalRecords, file.getOriginalFilename(), filePath);
 
             return new FileUploadResponse(
-                    fileMetaDataId,
-                    fileName,
-                    FileStatus.STARTED.name(),
-                    "Processing started"
+                    metaData.getFileId(),
+                    metaData.getFilename(),
+                    FileStatus.PENDING.name(),
+                    "Queued for processing"
             );
 
         } catch (Exception e) {
@@ -347,8 +361,9 @@ public class FileServiceImpl implements IFileService {
     }
 
 
-    private String saveFileToDisk(MultipartFile file) throws Exception {
-        String filename = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
+    private String saveFileToDisk(MultipartFile file, Long fileId) throws Exception {
+        String originalFilename = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
+        String filename = fileId + "_" + originalFilename;
 
         Path uploadPath = Paths.get(tempDir);
         Files.createDirectories(uploadPath);
@@ -364,16 +379,18 @@ public class FileServiceImpl implements IFileService {
 
     }
 
-    private FileLoadMetaData saveMetaData(MultipartFile file) {
+    private FileLoadMetaData saveInitialMetaData(MultipartFile file) {
         FileLoadMetaData metaData = new FileLoadMetaData();
         metaData.setFilename(file.getOriginalFilename());
         metaData.setUploadTime(LocalDateTime.now());
-        metaData.setStatus(FileStatus.STARTED);
+        metaData.setStatus(FileStatus.PENDING);
+        metaData.setTotalRecords(0);
+        metaData.setSuccessCount(0);
+        metaData.setErrorCount(0);
+        metaData.setDuplicateCount(0);
         currentUser().ifPresent(metaData::setUser);
         return transactionMetaTableRepository.save(metaData);
     }
-
-
     private JobParameters buildJobParameters(String filePath, Long fileMetaDataId) {
         return new JobParametersBuilder()
                 .addString("filePath", filePath)

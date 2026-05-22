@@ -30,6 +30,17 @@ public interface TransactionMainTableRepository
     boolean existsByTransactionIdForOwner(@Param("transactionId") String transactionId,
                                           @Param("userId") Long userId);
 
+    @Query("""
+           SELECT t.transactionId
+           FROM TradeTransaction t
+           WHERE t.transactionId IN :transactionIds
+             AND ((:userId IS NULL AND t.metaData.user IS NULL) OR t.metaData.user.id = :userId)
+           """)
+    java.util.List<String> findExistingTransactionIdsForOwner(
+            @Param("transactionIds") java.util.Collection<String> transactionIds,
+            @Param("userId") Long userId);
+
+
     @Query("SELECT COUNT(t) FROM TradeTransaction t WHERE t.metaData.user.id = :userId")
     long countByUserId(@Param("userId") Long userId);
 

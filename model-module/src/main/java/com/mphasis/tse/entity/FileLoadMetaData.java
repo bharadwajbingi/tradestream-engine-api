@@ -22,6 +22,9 @@ public class FileLoadMetaData {
     @Column(name = "filename", nullable = false)
     private String filename;
 
+    @Column(name = "file_path", length = 1000)
+    private String filePath;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
@@ -38,6 +41,9 @@ public class FileLoadMetaData {
     @Column(name = "error_count")
     private Integer errorCount;
 
+    @Column(name = "duplicate_count")
+    private Integer duplicateCount = 0;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     private FileStatus status;
@@ -47,4 +53,7 @@ public class FileLoadMetaData {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    @Column(name = "processing_time_ms")
+    private Long processingTimeMs;
 }

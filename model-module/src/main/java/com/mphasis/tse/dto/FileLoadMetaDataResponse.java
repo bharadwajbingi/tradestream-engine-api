@@ -20,6 +20,8 @@ public class FileLoadMetaDataResponse {
     private int totalRecords;
     private int successCount;
     private int errorCount;
+    private int duplicateCount;
     private String status;
+    private Long processingTimeMs;
 
 }
