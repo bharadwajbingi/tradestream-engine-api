@@ -20,6 +20,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import java.security.Principal;
 
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -38,6 +40,10 @@ public class ExportController {
     private final TradeArchiveRepository tradeArchiveRepository;
     private final TransactionMetaTableRepository transactionMetaTableRepository;
     private final TransactionErrorRepository transactionErrorRepository;
+    private final com.mphasis.tse.service.ExportService exportService;
+    private final com.mphasis.tse.service.AsyncExportWorker asyncExportWorker;
+    private final com.mphasis.tse.repository.ExportJobRepository exportJobRepository;
+    private final com.mphasis.tse.service.S3Service s3Service;
 
     private static final String[] TRANSACTION_HEADERS = {
             "Transaction ID", "Record Tracking ID", "File Header Date", "Account Number", "Transaction Type",
@@ -85,7 +91,7 @@ public class ExportController {
     }
 
     @GetMapping("/transactions/export")
-    public void exportTransactions(
+    public ResponseEntity<?> exportTransactions(
             @RequestParam(value = "startDate", required = false) String startDate,
             @RequestParam(value = "endDate", required = false) String endDate,
             @RequestParam(value = "fileId", required = false) Long fileId,
@@ -94,66 +100,26 @@ public class ExportController {
 
         log.info("Streaming active transactions export for user: {}", principal != null ? principal.getEmail() : "anonymous");
 
-        List<TradeTransaction> activeList;
+        String cleanStart = (startDate != null && !startDate.trim().isEmpty()) ? startDate.replace("-", "").trim() : null;
+        String cleanEnd = (endDate != null && !endDate.trim().isEmpty()) ? endDate.replace("-", "").trim() : null;
+        Optional<Long> userId = currentUserId(principal);
+
         if (fileId != null) {
             assertFileAccess(fileId, principal);
-            activeList = currentUserId(principal)
-                    .map(userId -> transactionMainTableRepository.findByFileIdAndUserId(fileId, userId))
-                    .orElseGet(() -> transactionMainTableRepository.findByFileId(fileId));
-        } else {
-            String cleanStart = (startDate != null && !startDate.trim().isEmpty()) ? startDate.replace("-", "").trim() : null;
-            String cleanEnd = (endDate != null && !endDate.trim().isEmpty()) ? endDate.replace("-", "").trim() : null;
-            Optional<Long> userId = currentUserId(principal);
-            if (userId.isPresent()) {
-                activeList = transactionMainTableRepository.findByFileHeaderDateBetweenAndUserId(cleanStart, cleanEnd, userId.get());
-            } else {
-                activeList = transactionMainTableRepository.findByFileHeaderDateBetween(cleanStart, cleanEnd);
-            }
         }
 
-        response.setContentType("text/csv");
-        response.setCharacterEncoding("UTF-8");
-        String filename = "active_transactions_" + System.currentTimeMillis() + ".csv";
-        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+        com.mphasis.tse.entity.ExportJob job = new com.mphasis.tse.entity.ExportJob();
+        job.setUserId(userId.orElse(null));
+        job.setStatus("PENDING");
+        exportJobRepository.save(job);
 
-        try (Writer writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8);
-             CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT.builder().setHeader(TRANSACTION_HEADERS).build())) {
+        asyncExportWorker.processActiveTransactionsExport(job.getId(), cleanStart, cleanEnd, fileId, userId);
 
-            for (TradeTransaction t : activeList) {
-                csvPrinter.printRecord(
-                        t.getTransactionId(),
-                        t.getRecordTrackingId(),
-                        t.getFileHeaderDate(),
-                        t.getAccountNumber(),
-                        t.getTransactionType(),
-                        t.getBatchLocation(),
-                        t.getBatchNumber(),
-                        t.getUpdateBatchDate(),
-                        t.getRelatedFileNumber(),
-                        t.getActionName(),
-                        t.getRelatedFileKey(),
-                        t.getDoNotReportFlag(),
-                        t.getExplanation(),
-                        t.getMinorAssetsClass(),
-                        t.getOwningPortfolio(),
-                        t.getPosterInitials(),
-                        t.getTransactionSubtype(),
-                        t.getCashEffect() != null ? t.getCashEffect().toPlainString() : "0.00",
-                        t.getCashPaidOut() != null ? t.getCashPaidOut().toPlainString() : "0.00",
-                        t.getBrokerNumber(),
-                        t.getOldBalance() != null ? t.getOldBalance().toPlainString() : "0.00",
-                        t.getNewBalance() != null ? t.getNewBalance().toPlainString() : "0.00",
-                        t.getRowNumber(),
-                        t.getMetaData() != null ? t.getMetaData().getFileId() : null,
-                        "FALSE"
-                );
-            }
-            csvPrinter.flush();
-        }
+        return ResponseEntity.accepted().body(java.util.Collections.singletonMap("jobId", job.getId()));
     }
 
     @GetMapping("/transactions/archive/export")
-    public void exportArchivedTransactions(
+    public ResponseEntity<?> exportArchivedTransactions(
             @RequestParam(value = "startDate", required = false) String startDate,
             @RequestParam(value = "endDate", required = false) String endDate,
             @RequestParam(value = "fileId", required = false) Long fileId,
@@ -162,65 +128,43 @@ public class ExportController {
 
         log.info("Streaming archived transactions export for user: {}", principal != null ? principal.getEmail() : "anonymous");
 
-        List<TradeArchive> archiveList;
+        String cleanStart = (startDate != null && !startDate.trim().isEmpty()) ? startDate.replace("-", "").trim() : null;
+        String cleanEnd = (endDate != null && !endDate.trim().isEmpty()) ? endDate.replace("-", "").trim() : null;
+        Optional<Long> userId = currentUserId(principal);
+
         if (fileId != null) {
             assertFileAccess(fileId, principal);
-            archiveList = tradeArchiveRepository.findByFileId(fileId);
-        } else {
-            String cleanStart = (startDate != null && !startDate.trim().isEmpty()) ? startDate.replace("-", "").trim() : null;
-            String cleanEnd = (endDate != null && !endDate.trim().isEmpty()) ? endDate.replace("-", "").trim() : null;
-            Optional<Long> userId = currentUserId(principal);
-            if (userId.isPresent()) {
-                List<Long> fileIds = transactionMetaTableRepository.findActiveFileIdsByUserId(userId.get());
-                if (!fileIds.isEmpty()) {
-                    archiveList = tradeArchiveRepository.findByFileIdInAndFileHeaderDateBetween(fileIds, cleanStart, cleanEnd);
-                } else {
-                    archiveList = new ArrayList<>();
-                }
-            } else {
-                archiveList = tradeArchiveRepository.findByFileHeaderDateBetween(cleanStart, cleanEnd);
-            }
         }
 
-        response.setContentType("text/csv");
-        response.setCharacterEncoding("UTF-8");
-        String filename = "archived_transactions_" + System.currentTimeMillis() + ".csv";
-        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+        com.mphasis.tse.entity.ExportJob job = new com.mphasis.tse.entity.ExportJob();
+        job.setUserId(userId.orElse(null));
+        job.setStatus("PENDING");
+        exportJobRepository.save(job);
 
-        try (Writer writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8);
-             CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT.builder().setHeader(TRANSACTION_HEADERS).build())) {
+        asyncExportWorker.processArchivedTransactionsExport(job.getId(), cleanStart, cleanEnd, fileId, userId);
 
-            for (TradeArchive a : archiveList) {
-                csvPrinter.printRecord(
-                        a.getTransactionId(),
-                        a.getRecordTrackingId(),
-                        a.getFileHeaderDate(),
-                        a.getAccountNumber(),
-                        a.getTransactionType(),
-                        a.getBatchLocation(),
-                        a.getBatchNumber(),
-                        a.getUpdateBatchDate(),
-                        a.getRelatedFileNumber(),
-                        a.getActionName(),
-                        a.getRelatedFileKey(),
-                        a.getDoNotReportFlag(),
-                        a.getExplanation(),
-                        a.getMinorAssetsClass(),
-                        a.getOwningPortfolio(),
-                        a.getPosterInitials(),
-                        a.getTransactionSubtype(),
-                        a.getCashEffect() != null ? a.getCashEffect().toPlainString() : "0.00",
-                        a.getCashPaidOut() != null ? a.getCashPaidOut().toPlainString() : "0.00",
-                        a.getBrokerNumber(),
-                        a.getOldBalance() != null ? a.getOldBalance().toPlainString() : "0.00",
-                        a.getNewBalance() != null ? a.getNewBalance().toPlainString() : "0.00",
-                        null,
-                        a.getFileId(),
-                        "TRUE"
-                );
-            }
-            csvPrinter.flush();
+        return ResponseEntity.accepted().body(java.util.Collections.singletonMap("jobId", job.getId()));
+    }
+
+    @GetMapping("/status/{jobId}")
+    public ResponseEntity<?> getExportStatus(@PathVariable String jobId, @AuthenticationPrincipal User principal) {
+        com.mphasis.tse.entity.ExportJob job = exportJobRepository.findById(jobId)
+                .orElseThrow(() -> new RuntimeException("Job not found"));
+
+        Optional<Long> currentUserId = currentUserId(principal);
+        if (job.getUserId() != null && currentUserId.isPresent() && !job.getUserId().equals(currentUserId.get())) {
+            return ResponseEntity.status(403).body(java.util.Collections.singletonMap("error", "Access denied"));
         }
+
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("status", job.getStatus());
+        if ("COMPLETED".equals(job.getStatus()) && job.getS3Url() != null) {
+            response.put("downloadUrl", s3Service.generatePresignedUrl(job.getS3Url()));
+        } else if ("FAILED".equals(job.getStatus())) {
+            response.put("error", job.getErrorMessage());
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/file/errors/export")

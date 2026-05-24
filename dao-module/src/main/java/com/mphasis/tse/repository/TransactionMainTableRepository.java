@@ -47,12 +47,28 @@ public interface TransactionMainTableRepository
     @Query("SELECT t FROM TradeTransaction t WHERE t.metaData.fileId = :fileId")
     java.util.List<TradeTransaction> findByFileId(@Param("fileId") Long fileId);
 
+    @org.springframework.data.jpa.repository.QueryHints(value = @jakarta.persistence.QueryHint(name = "org.hibernate.fetchSize", value = "1000"))
+    @Query("SELECT t FROM TradeTransaction t WHERE t.metaData.fileId = :fileId")
+    java.util.stream.Stream<com.mphasis.tse.dto.TradeExportProjection> streamByFileId(@Param("fileId") Long fileId);
+
     @Query("SELECT t FROM TradeTransaction t WHERE t.metaData.fileId = :fileId AND t.metaData.user.id = :userId")
     java.util.List<TradeTransaction> findByFileIdAndUserId(@Param("fileId") Long fileId, @Param("userId") Long userId);
+
+    @org.springframework.data.jpa.repository.QueryHints(value = @jakarta.persistence.QueryHint(name = "org.hibernate.fetchSize", value = "1000"))
+    @Query("SELECT t FROM TradeTransaction t WHERE t.metaData.fileId = :fileId AND t.metaData.user.id = :userId")
+    java.util.stream.Stream<com.mphasis.tse.dto.TradeExportProjection> streamByFileIdAndUserId(@Param("fileId") Long fileId, @Param("userId") Long userId);
 
     @Query("SELECT t FROM TradeTransaction t WHERE (:start IS NULL OR t.fileHeaderDate >= :start) AND (:end IS NULL OR t.fileHeaderDate <= :end)")
     java.util.List<TradeTransaction> findByFileHeaderDateBetween(@Param("start") String start, @Param("end") String end);
 
+    @org.springframework.data.jpa.repository.QueryHints(value = @jakarta.persistence.QueryHint(name = "org.hibernate.fetchSize", value = "1000"))
+    @Query("SELECT t FROM TradeTransaction t WHERE (:start IS NULL OR t.fileHeaderDate >= :start) AND (:end IS NULL OR t.fileHeaderDate <= :end)")
+    java.util.stream.Stream<com.mphasis.tse.dto.TradeExportProjection> streamByFileHeaderDateBetween(@Param("start") String start, @Param("end") String end);
+
     @Query("SELECT t FROM TradeTransaction t WHERE t.metaData.user.id = :userId AND (:start IS NULL OR t.fileHeaderDate >= :start) AND (:end IS NULL OR t.fileHeaderDate <= :end)")
     java.util.List<TradeTransaction> findByFileHeaderDateBetweenAndUserId(@Param("start") String start, @Param("end") String end, @Param("userId") Long userId);
+
+    @org.springframework.data.jpa.repository.QueryHints(value = @jakarta.persistence.QueryHint(name = "org.hibernate.fetchSize", value = "1000"))
+    @Query("SELECT t FROM TradeTransaction t WHERE t.metaData.user.id = :userId AND (:start IS NULL OR t.fileHeaderDate >= :start) AND (:end IS NULL OR t.fileHeaderDate <= :end)")
+    java.util.stream.Stream<com.mphasis.tse.dto.TradeExportProjection> streamByFileHeaderDateBetweenAndUserId(@Param("start") String start, @Param("end") String end, @Param("userId") Long userId);
 }

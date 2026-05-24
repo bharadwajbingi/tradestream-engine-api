@@ -36,6 +36,10 @@ public interface TradeArchiveRepository extends JpaRepository<TradeArchive, Long
     @Query("SELECT a FROM TradeArchive a WHERE a.fileId = :fileId")
     java.util.List<TradeArchive> findByFileId(@Param("fileId") Long fileId);
 
+    @org.springframework.data.jpa.repository.QueryHints(value = @jakarta.persistence.QueryHint(name = "org.hibernate.fetchSize", value = "1000"))
+    @Query("SELECT a FROM TradeArchive a WHERE a.fileId = :fileId")
+    java.util.stream.Stream<com.mphasis.tse.dto.TradeExportProjection> streamByFileId(@Param("fileId") Long fileId);
+
     @Query("SELECT a FROM TradeArchive a WHERE a.fileId IN :fileIds")
     java.util.List<TradeArchive> findByFileIdIn(@Param("fileIds") java.util.List<Long> fileIds);
 
@@ -45,6 +49,16 @@ public interface TradeArchiveRepository extends JpaRepository<TradeArchive, Long
     java.util.List<TradeArchive> findByFileIdInAndFileHeaderDateBetween(@Param("fileIds") java.util.List<Long> fileIds,
                                                                         @Param("start") String start,
                                                                         @Param("end") String end);
+
+    @org.springframework.data.jpa.repository.QueryHints(value = @jakarta.persistence.QueryHint(name = "org.hibernate.fetchSize", value = "1000"))
+    @Query("SELECT a FROM TradeArchive a WHERE a.fileId IN :fileIds AND (:start IS NULL OR a.fileHeaderDate >= :start) AND (:end IS NULL OR a.fileHeaderDate <= :end)")
+    java.util.stream.Stream<com.mphasis.tse.dto.TradeExportProjection> streamByFileIdInAndFileHeaderDateBetween(@Param("fileIds") java.util.List<Long> fileIds,
+                                                                        @Param("start") String start,
+                                                                        @Param("end") String end);
+
+    @org.springframework.data.jpa.repository.QueryHints(value = @jakarta.persistence.QueryHint(name = "org.hibernate.fetchSize", value = "1000"))
+    @Query("SELECT a FROM TradeArchive a WHERE (:start IS NULL OR a.fileHeaderDate >= :start) AND (:end IS NULL OR a.fileHeaderDate <= :end)")
+    java.util.stream.Stream<com.mphasis.tse.dto.TradeExportProjection> streamByFileHeaderDateBetween(@Param("start") String start, @Param("end") String end);
 
     @Modifying
     @Transactional
