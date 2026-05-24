@@ -328,13 +328,12 @@ public class FileServiceImpl implements IFileService {
             FileLoadMetaData metaData = saveInitialMetaData(file);
 
             String filePath = saveFileToDisk(file, metaData.getFileId());
-            int totalRecords = countCsvRows(filePath);
             
             metaData.setFilePath(filePath);
-            metaData.setTotalRecords(totalRecords);
+            metaData.setTotalRecords(0); // Set to 0 initially; counted asynchronously by JobListener before processing starts
             transactionMetaTableRepository.save(metaData);
 
-            log.info("Counted {} rows in CSV file: {} saved at {}", totalRecords, file.getOriginalFilename(), filePath);
+            log.info("File {} uploaded successfully and saved at {}", file.getOriginalFilename(), filePath);
 
             return new FileUploadResponse(
                     metaData.getFileId(),

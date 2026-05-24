@@ -42,7 +42,34 @@ public class JobListener implements JobExecutionListener {
 
         fileLoadMetaData.setStatus(FileStatus.PROCESSING);
         fileLoadMetaData.setUploadTime(LocalDateTime.now());
+
+        // Count CSV rows in the background (within this job execution thread)
+        String filePath = jobExecution.getJobParameters().getString("filePath");
+        if (filePath != null && !filePath.isBlank()) {
+            try {
+                log.info("Calculating CSV row count in the background for filePath={}", filePath);
+                int totalRecords = countCsvRows(filePath);
+                fileLoadMetaData.setTotalRecords(totalRecords);
+                log.info("Background CSV row count complete. filePath={}, totalRecords={}", filePath, totalRecords);
+            } catch (Exception e) {
+                log.error("Failed to calculate background row count for fileId={}", metaId, e);
+            }
+        }
+
         transactionMetaTableRepository.save(fileLoadMetaData);
+    }
+
+    private int countCsvRows(String filePath) {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(filePath))) {
+            int lines = 0;
+            while (reader.readLine() != null) {
+                lines++;
+            }
+            return lines > 0 ? lines - 1 : 0;
+        } catch (Exception e) {
+            log.error("Failed to count lines in CSV file: {}", filePath, e);
+            return 0;
+        }
     }
 
     @Override
@@ -99,7 +126,11 @@ public class JobListener implements JobExecutionListener {
         fileLoadMetaData.setSuccessCount(successCount);
         fileLoadMetaData.setErrorCount(errorCount);
         fileLoadMetaData.setDuplicateCount(duplicateCount);
-        fileLoadMetaData.setTotalRecords((int) readCount);
+        
+        // Prevent overwriting calculated totalRecords if it was already populated in beforeJob
+        if (fileLoadMetaData.getTotalRecords() == null || fileLoadMetaData.getTotalRecords() <= 0) {
+            fileLoadMetaData.setTotalRecords((int) readCount);
+        }
 
         if (fileLoadMetaData.getUploadTime() != null) {
             long durationMs = java.time.Duration.between(fileLoadMetaData.getUploadTime(), LocalDateTime.now()).toMillis();

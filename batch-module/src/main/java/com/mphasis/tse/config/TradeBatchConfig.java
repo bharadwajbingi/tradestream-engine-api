@@ -95,23 +95,19 @@ public class TradeBatchConfig {
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
             ItemStreamReader<String[]> reader,
-            AsyncTaskExecutor stepTaskExecutor,
             ItemProcessor<String[], TradeWrapper> processor,
             ItemWriter<TradeWrapper> writer) {
         return new StepBuilder(STEP_NAME, jobRepository)
-                .<String[], TradeWrapper>chunk(chunkSize,transactionManager)
+                .<String[], TradeWrapper>chunk(chunkSize, transactionManager)
                 .reader(reader)
                 .processor(processor)
                 .writer(writer)
-                .taskExecutor(stepTaskExecutor)
                 .build();
     }
 
-
-    @Bean(name =JOB_NAME )
+    @Bean(name = JOB_NAME)
     public Job tradeFileProcessingJob(JobRepository jobRepository,
                                       Step tradeProcessingStep) {
-
         return new JobBuilder(JOB_NAME, jobRepository)
                 .listener(jobListener)
                 .start(tradeProcessingStep)

@@ -10,6 +10,11 @@ spring:
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      idle-timeout: 30000
+      pool-name: HikariCP-Trade
 
   jpa:
     hibernate:
@@ -19,7 +24,7 @@ spring:
     properties:
       hibernate:
         jdbc:
-          batch_size: 5000
+          batch_size: 250
         order_inserts: true
         order_updates: true
 
@@ -51,7 +56,7 @@ server:
 
 batch:
   trade:
-    chunk-size: ${BATCH_TRADE_CHUNK_SIZE:5000}
+    chunk-size: ${BATCH_TRADE_CHUNK_SIZE:250}
 
 security:
   jwt:
