@@ -53,6 +53,37 @@ public class ExportController {
             "Error Field", "Error Message", "Status", "Created Time", "Row Number", "File ID"
     };
 
+    @GetMapping("/file/download/{fileId}")
+    public void downloadOriginalFile(
+            @PathVariable("fileId") Long fileId,
+            @AuthenticationPrincipal User principal,
+            HttpServletResponse response) throws IOException {
+
+        log.info("Streaming original uploaded file for fileId: {}", fileId);
+
+        com.mphasis.tse.entity.FileLoadMetaData metaData = transactionMetaTableRepository.findById(fileId)
+                .orElseThrow(() -> new com.mphasis.tse.exception.FileNotFoundException("File metadata not found for id " + fileId));
+
+        assertFileAccess(fileId, principal);
+
+        String filePathStr = metaData.getFilePath();
+        if (filePathStr == null) {
+            throw new com.mphasis.tse.exception.FileNotFoundException("File path not set for metadata id " + fileId);
+        }
+
+        java.nio.file.Path filePath = java.nio.file.Paths.get(filePathStr);
+        if (!java.nio.file.Files.exists(filePath)) {
+            throw new com.mphasis.tse.exception.FileNotFoundException("Physical file not found on disk at " + filePathStr);
+        }
+
+        response.setContentType("text/csv");
+        response.setCharacterEncoding("UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + metaData.getFilename() + "\"");
+
+        java.nio.file.Files.copy(filePath, response.getOutputStream());
+        response.getOutputStream().flush();
+    }
+
     @GetMapping("/transactions/export")
     public void exportTransactions(
             @RequestParam(value = "startDate", required = false) String startDate,

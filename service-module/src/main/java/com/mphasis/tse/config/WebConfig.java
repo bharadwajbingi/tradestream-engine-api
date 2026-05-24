@@ -16,7 +16,16 @@ public class WebConfig {
             public void addCorsMappings(CorsRegistry registry) {
 
                 registry.addMapping("/**")
-                        .allowedOrigins("http://localhost:4200", "http://localhost:5173","https://d2i9y8go17l95q.cloudfront.net")
+                        .allowedOrigins(
+                                "http://localhost:8080", 
+                                "http://localhost:8081", 
+                                "http://localhost:8082", 
+                                "http://localhost:3000", 
+                                "http://localhost:4200", 
+                                "http://localhost:5173", 
+                                "http://localhost:5174",
+                                "https://d2i9y8go17l95q.cloudfront.net"
+                        )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);

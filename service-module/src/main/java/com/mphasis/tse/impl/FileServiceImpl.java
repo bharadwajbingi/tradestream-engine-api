@@ -180,42 +180,8 @@ public class FileServiceImpl implements IFileService {
 
 
     public List<TransactionErrorResponse> searchFileErrors(TransactionErrorSearchRequest request) {
-        Specification<TransactionError> spec =
-                Specification.where(ownedErrorSpec());
-        if (request.getFileLoadId() != null) {
-            spec = spec.and(
-                    TransactionErrorSpecification.hasFileLoadId(request.getFileLoadId())
-            );
-        }
-        if (request.getTransactionId() != null) {
-            spec = spec.and(
-                    TransactionErrorSpecification.hasTransactionId(request.getTransactionId())
-            );
-        }
-        if (request.getAccountNumber() != null) {
-            spec = spec.and(
-                    TransactionErrorSpecification.hasAccountNumber(request.getAccountNumber())
-            );
-        }
-        if (request.getErrorField() != null) {
-            spec = spec.and(
-                    TransactionErrorSpecification.hasErrorField(request.getErrorField())
-            );
-        }
-        if (request.getStatus() != null) {
-            ErrorStatus statusEnum = ErrorStatus.valueOf(request.getStatus().toUpperCase());
-
-            spec = spec.and(
-                    TransactionErrorSpecification.hasStatus(statusEnum)
-            );
-
-        } else {
-            // Exclude IGNORED and DUPLICATE status by default when listing/searching
-            spec = spec.and((root, query, cb) -> cb.and(
-                cb.notEqual(root.get("status"), ErrorStatus.IGNORED),
-                cb.notEqual(root.get("status"), ErrorStatus.DUPLICATE)
-            ));
-        }
+        log.info("Search File Errors started");
+        Specification<TransactionError> spec = buildErrorSearchSpec(request);
         List<TransactionError> result = transactionErrorRepository.findAll(spec);
         return transactionErrorMapper.toDtoList(result);
     }
@@ -569,7 +535,7 @@ public class FileServiceImpl implements IFileService {
         if (request.getErrorField() != null) {
             spec = spec.and(TransactionErrorSpecification.hasErrorField(request.getErrorField()));
         }
-        if (request.getStatus() != null) {
+        if (request.getStatus() != null && !request.getStatus().equalsIgnoreCase("ALL")) {
             ErrorStatus statusEnum = ErrorStatus.valueOf(request.getStatus().toUpperCase());
             spec = spec.and(TransactionErrorSpecification.hasStatus(statusEnum));
         } else {
@@ -577,6 +543,9 @@ public class FileServiceImpl implements IFileService {
                     cb.notEqual(root.get("status"), ErrorStatus.IGNORED),
                     cb.notEqual(root.get("status"), ErrorStatus.DUPLICATE)
             ));
+        }
+        if (request.getGlobalSearchTerm() != null && !request.getGlobalSearchTerm().isEmpty()) {
+            spec = spec.and(TransactionErrorSpecification.hasGlobalSearchTerm(request.getGlobalSearchTerm()));
         }
         return spec;
     }

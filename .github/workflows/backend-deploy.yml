@@ -30,5 +30,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/tradestream
+            docker system prune -f
+            docker image prune -f
             docker compose pull
             docker compose up -d

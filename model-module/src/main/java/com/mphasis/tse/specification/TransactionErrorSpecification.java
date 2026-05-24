@@ -46,4 +46,17 @@ public class TransactionErrorSpecification {
         return (root, query, cb) ->
                 cb.equal(root.get("status"), status);
     }
+
+    public static Specification<TransactionError> hasGlobalSearchTerm(String searchTerm) {
+        return (root, query, cb) -> {
+            String pattern = "%" + searchTerm.toLowerCase() + "%";
+            return cb.or(
+                    cb.like(cb.lower(root.get("transactionId")), pattern),
+                    cb.like(cb.lower(root.get("accountNumber")), pattern),
+                    cb.like(cb.lower(root.get("errorMessage")), pattern),
+                    cb.like(cb.lower(root.get("errorField")), pattern),
+                    cb.like(cb.lower(root.get("metaData").get("filename")), pattern)
+            );
+        };
+    }
 }

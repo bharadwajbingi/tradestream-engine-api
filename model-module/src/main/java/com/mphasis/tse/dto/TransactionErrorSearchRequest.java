@@ -23,4 +23,6 @@ public class TransactionErrorSearchRequest
 
     private Integer size = 20;
 
+    private String globalSearchTerm;
+
 }
