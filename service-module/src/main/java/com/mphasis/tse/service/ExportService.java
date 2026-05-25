@@ -20,6 +20,8 @@ public class ExportService {
     private final TransactionMainTableRepository mainRepo;
     private final TradeArchiveRepository archiveRepo;
     private final TransactionMetaTableRepository metaRepo;
+    private final com.mphasis.tse.repository.ExportJobRepository exportJobRepository;
+    private final S3Service s3Service;
 
     @Transactional(readOnly = true)
     public void streamActiveTransactions(String startDate, String endDate, Long fileId, Optional<Long> userId, Consumer<Stream<TradeExportProjection>> streamConsumer) {
@@ -62,6 +64,25 @@ public class ExportService {
 
         try (stream) {
             streamConsumer.accept(stream);
+        }
+    }
+
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 0 * * * *")
+    @Transactional
+    public void cleanupExpiredExports() {
+        java.time.LocalDateTime cutoff = java.time.LocalDateTime.now().minusHours(24);
+        List<com.mphasis.tse.entity.ExportJob> expiredJobs = exportJobRepository.findByDownloadedTrueAndDownloadedAtBefore(cutoff);
+        
+        for (com.mphasis.tse.entity.ExportJob job : expiredJobs) {
+            if (job.getS3Url() != null) {
+                try {
+                    s3Service.deleteFile(job.getS3Url());
+                } catch (Exception e) {
+                    // Log error and continue with other deletions
+                    System.err.println("Failed to delete from S3: " + job.getS3Url() + " - " + e.getMessage());
+                }
+            }
+            exportJobRepository.delete(job);
         }
     }
 }

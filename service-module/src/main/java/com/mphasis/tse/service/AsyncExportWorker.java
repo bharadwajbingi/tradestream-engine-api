@@ -113,7 +113,14 @@ public class AsyncExportWorker {
         } catch (Exception e) {
             log.error("Failed to process export job {}", jobId, e);
             job.setStatus("FAILED");
-            job.setErrorMessage(e.getMessage());
+            
+            // Extract a concise message and truncate to 255 chars just in case (even though DB is TEXT)
+            String safeMsg = e.getMessage() != null ? e.getMessage() : "Unknown error occurred";
+            if (safeMsg.length() > 250) {
+                safeMsg = safeMsg.substring(0, 247) + "...";
+            }
+            job.setErrorMessage("Export failed: " + safeMsg);
+            
             job.setUpdatedAt(LocalDateTime.now());
             exportJobRepository.save(job);
         } finally {

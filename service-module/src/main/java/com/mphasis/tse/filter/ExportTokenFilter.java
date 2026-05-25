@@ -31,7 +31,9 @@ public class ExportTokenFilter extends OncePerRequestFilter {
 
         String path = request.getServletPath();
 
-        if (path.endsWith("/export") || path.contains("/export/")) {
+        if ((path.endsWith("/export") || path.contains("/export/")) 
+            && !path.contains("/export/jobs") 
+            && !path.contains("/export/status")) {
             String token = request.getHeader("X-Export-Token");
             if (token == null || token.isBlank()) {
                 token = request.getParameter("token");

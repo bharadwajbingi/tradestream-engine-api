@@ -32,10 +32,11 @@ public class S3Service {
         s3Client.putObject(putObjectRequest, RequestBody.fromFile(file));
     }
 
-    public String generatePresignedUrl(String key) {
+    public String generatePresignedUrl(String key, String downloadFilename) {
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(bucketName)
                 .key(key)
+                .responseContentDisposition("attachment; filename=\"" + downloadFilename + "\"")
                 .build();
 
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
@@ -45,5 +46,13 @@ public class S3Service {
 
         PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
         return presignedRequest.url().toString();
+    }
+
+    public void deleteFile(String key) {
+        software.amazon.awssdk.services.s3.model.DeleteObjectRequest deleteObjectRequest = software.amazon.awssdk.services.s3.model.DeleteObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .build();
+        s3Client.deleteObject(deleteObjectRequest);
     }
 }

@@ -146,7 +146,7 @@ public class ExportController {
         return ResponseEntity.accepted().body(java.util.Collections.singletonMap("jobId", job.getId()));
     }
 
-    @GetMapping("/status/{jobId}")
+    @GetMapping("/transactions/export/status/{jobId}")
     public ResponseEntity<?> getExportStatus(@PathVariable String jobId, @AuthenticationPrincipal User principal) {
         com.mphasis.tse.entity.ExportJob job = exportJobRepository.findById(jobId)
                 .orElseThrow(() -> new RuntimeException("Job not found"));
@@ -158,12 +158,62 @@ public class ExportController {
 
         java.util.Map<String, String> response = new java.util.HashMap<>();
         response.put("status", job.getStatus());
-        if ("COMPLETED".equals(job.getStatus()) && job.getS3Url() != null) {
-            response.put("downloadUrl", s3Service.generatePresignedUrl(job.getS3Url()));
-        } else if ("FAILED".equals(job.getStatus())) {
+        if ("FAILED".equals(job.getStatus())) {
             response.put("error", job.getErrorMessage());
         }
+        // downloadUrl is omitted here so the client must call /download/{jobId} endpoint
 
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/transactions/export/jobs")
+    public ResponseEntity<?> listExportJobs(@AuthenticationPrincipal User principal) {
+        Optional<Long> currentUserId = currentUserId(principal);
+        if (currentUserId.isEmpty()) {
+            return ResponseEntity.status(401).body(java.util.Collections.singletonMap("error", "Unauthorized"));
+        }
+        
+        List<com.mphasis.tse.entity.ExportJob> jobs = exportJobRepository.findByUserIdOrderByCreatedAtDesc(currentUserId.get());
+        
+        List<java.util.Map<String, Object>> response = new ArrayList<>();
+        for (com.mphasis.tse.entity.ExportJob job : jobs) {
+            java.util.Map<String, Object> jobMap = new java.util.HashMap<>();
+            jobMap.put("id", job.getId());
+            jobMap.put("status", job.getStatus());
+            jobMap.put("createdAt", job.getCreatedAt());
+            jobMap.put("downloaded", job.isDownloaded());
+            if ("FAILED".equals(job.getStatus())) {
+                jobMap.put("errorMessage", job.getErrorMessage());
+            }
+            response.add(jobMap);
+        }
+        
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/transactions/export/download/{jobId}")
+    public ResponseEntity<?> downloadExport(@PathVariable String jobId, @AuthenticationPrincipal User principal) {
+        com.mphasis.tse.entity.ExportJob job = exportJobRepository.findById(jobId)
+                .orElseThrow(() -> new RuntimeException("Job not found"));
+
+        Optional<Long> currentUserId = currentUserId(principal);
+        if (job.getUserId() != null && currentUserId.isPresent() && !job.getUserId().equals(currentUserId.get())) {
+            return ResponseEntity.status(403).body(java.util.Collections.singletonMap("error", "Access denied"));
+        }
+
+        if (!"COMPLETED".equals(job.getStatus()) || job.getS3Url() == null) {
+            return ResponseEntity.badRequest().body(java.util.Collections.singletonMap("error", "Export not ready or missing"));
+        }
+
+        job.setDownloaded(true);
+        job.setDownloadedAt(java.time.LocalDateTime.now());
+        exportJobRepository.save(job);
+
+        String filename = "Trade_Data_Export_" + java.time.LocalDate.now().toString().replace("-", "") + "_" + job.getId().substring(0,8) + ".csv";
+        String s3Url = s3Service.generatePresignedUrl(job.getS3Url(), filename);
+        
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("downloadUrl", s3Url);
         return ResponseEntity.ok(response);
     }
 

@@ -27,8 +27,14 @@ public class ExportJob {
 
     private String s3Url;
 
+    @jakarta.persistence.Column(columnDefinition = "TEXT")
     private String errorMessage;
 
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime updatedAt = LocalDateTime.now();
+    
+    private boolean downloaded = false;
+    private LocalDateTime downloadedAt;
+    
+    private String exportType; // e.g. "MAIN", "ARCHIVE"
 }
