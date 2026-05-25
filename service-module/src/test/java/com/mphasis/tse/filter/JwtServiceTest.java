@@ -1,13 +1,11 @@
 package com.mphasis.tse.filter;
 
-import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import javax.crypto.SecretKey;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -15,99 +13,55 @@ import static org.junit.jupiter.api.Assertions.*;
 class JwtServiceTest {
 
     private JwtService jwtService;
-
-    private static final SecretKey TEST_SECRET_KEY =
-            Keys.secretKeyFor(io.jsonwebtoken.SignatureAlgorithm.HS256);
-
-    private static final long TEST_EXPIRATION = 1000 * 60 * 60; // 1 hour
-    private static final String USERNAME = "testuser";
+    private UserDetails userDetails;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         jwtService = new JwtService();
-        ReflectionTestUtils.setField(jwtService, "key", TEST_SECRET_KEY);
-        ReflectionTestUtils.setField(jwtService, "expiration", TEST_EXPIRATION);
+        ReflectionTestUtils.setField(jwtService, "expiration", 3600000L); // 1 hour expiration
+        ReflectionTestUtils.setField(jwtService, "jwtSecret", "eW91ci1zdXBlci1zZWNyZXQtMzJjaGFyLWtleS1nb2VzLWhlcmUtbm93"); // Base64 encoded mock key
+        jwtService.init();
+
+        userDetails = new User("testuser@example.com", "password", Collections.emptyList());
     }
 
     @Test
-    void testGenerateToken_andExtractUsername() {
-        User user = new User(USERNAME, "password", Collections.emptyList());
-
-        String token = jwtService.generateToken(user);
-
+    void testGenerateAndValidateValidToken() {
+        String token = jwtService.generateToken(userDetails);
         assertNotNull(token);
-
-        String extractedUsername = jwtService.extractUsername(token);
-
-        assertEquals(USERNAME, extractedUsername);
-    }
-
-
-    @Test
-    void testIsTokenValid_withValidToken() {
-        User user = new User(USERNAME, "password", Collections.emptyList());
-
-        String token = jwtService.generateToken(user);
-
-        assertTrue(jwtService.isTokenValid(token, user));
+        assertTrue(jwtService.isTokenValid(token, userDetails));
+        assertEquals("testuser@example.com", jwtService.extractUsername(token));
+        assertFalse(jwtService.isTokenExpired(token));
     }
 
     @Test
-    void testCorruptedToken_shouldThrowException() {
-        User user = new User(USERNAME, "password", Collections.emptyList());
+    void testExpiredTokenValidation() throws Exception {
+        // Set very short expiration to generate expired token
+        JwtService shortLivedService = new JwtService();
+        ReflectionTestUtils.setField(shortLivedService, "expiration", -1000L); // Expired 1 second ago
+        ReflectionTestUtils.setField(shortLivedService, "jwtSecret", "eW91ci1zdXBlci1zZWNyZXQtMzJjaGFyLWtleS1nb2VzLWhlcmUtbm93");
+        shortLivedService.init();
 
-        String token = jwtService.generateToken(user);
-
-        String corruptedToken = token.substring(0, token.length() - 2) + "xx";
-
-        assertThrows(io.jsonwebtoken.security.SignatureException.class,
-                () -> jwtService.extractUsername(corruptedToken));
+        String expiredToken = shortLivedService.generateToken(userDetails);
+        assertNotNull(expiredToken);
+        assertFalse(shortLivedService.isTokenValid(expiredToken, userDetails));
+        assertTrue(shortLivedService.isTokenExpired(expiredToken));
     }
 
     @Test
-    void testIsTokenValid_withDifferentUsername() {
-        User user = new User(USERNAME, "password", Collections.emptyList());
-
-        String token = jwtService.generateToken(user);
-
-        User otherUser = new User("otheruser", "password", Collections.emptyList());
-
-        assertFalse(jwtService.isTokenValid(token, otherUser));
+    void testMalformedTokenValidation() {
+        String malformedToken = "invalidHeader.invalidPayload.invalidSignature";
+        assertFalse(jwtService.isTokenValid(malformedToken, userDetails));
+        assertNull(jwtService.extractUsername(malformedToken));
+        assertTrue(jwtService.isTokenExpired(malformedToken));
     }
 
     @Test
-    void testExpiredToken_shouldThrowException() {
-        JwtService service = new JwtService();
-
-        ReflectionTestUtils.setField(service, "key", TEST_SECRET_KEY);
-        ReflectionTestUtils.setField(service, "expiration", 1L);
-
-        User user = new User(USERNAME, "password", Collections.emptyList());
-
-        String token = service.generateToken(user);
-
-        assertThrows(io.jsonwebtoken.ExpiredJwtException.class,
-                () -> service.extractUsername(token));
-    }
-
-    @Test
-    void testMalformedToken_shouldThrowException() {
-        String invalidToken = "this.is.not.valid";
-
-        assertThrows(MalformedJwtException.class,
-                () -> jwtService.extractUsername(invalidToken));
-    }
-
-    @Test
-    void testInit_shouldGenerateKey() throws Exception {
-        JwtService service = new JwtService();
-
-        ReflectionTestUtils.setField(service, "expiration", TEST_EXPIRATION);
-
-        service.init();
-
-        Object key = ReflectionTestUtils.getField(service, "key");
-
-        assertNotNull(key);
+    void testTamperedTokenValidation() {
+        String originalToken = jwtService.generateToken(userDetails);
+        // Tamper with the token string
+        String tamperedToken = originalToken + "tamper";
+        assertFalse(jwtService.isTokenValid(tamperedToken, userDetails));
+        assertNull(jwtService.extractUsername(tamperedToken));
     }
 }

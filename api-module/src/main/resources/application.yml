@@ -18,7 +18,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     properties:
@@ -29,11 +29,16 @@ spring:
         order_inserts: true
         order_updates: true
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+
   batch:
     job:
       enabled: false
     jdbc:
-      initialize-schema: always
+      initialize-schema: never
 
   servlet:
     multipart:
@@ -69,14 +74,14 @@ batch:
 
 security:
   jwt:
-    secret: ${JWT_SECRET:trade-stream-engine-dev-secret-change-me}
+    secret: ${JWT_SECRET}
     expiration-time: ${JWT_EXPIRATION_MS:1800000}
 
   oauth2:
     frontend-redirect-url: ${FRONTEND_REDIRECT_URL:http://localhost:5173/oauth2/redirect}
 
   totp:
-    encryption-key: ${TOTP_ENCRYPTION_KEY:my-super-secret-totp-encryption-key-32chars!}
+    encryption-key: ${TOTP_ENCRYPTION_KEY}
 
 file:
   upload:

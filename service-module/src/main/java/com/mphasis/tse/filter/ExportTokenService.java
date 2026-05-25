@@ -20,21 +20,18 @@ public class ExportTokenService {
 
     private Key key;
 
-    @Value("${security.jwt.secret:}")
+    @Value("${security.jwt.secret}")
     private String jwtSecret;
 
     @PostConstruct
     public void init() throws Exception {
-        if (jwtSecret != null && !jwtSecret.isBlank()) {
-            byte[] keyBytes = resolveSecretBytes(jwtSecret);
-            this.key = Keys.hmacShaKeyFor(keyBytes);
-            log.info("Export Token signing key loaded from configuration");
-            return;
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            throw new IllegalStateException(
+                    "security.jwt.secret must be configured. Application cannot start without a JWT signing secret.");
         }
-
-        byte[] generatedDevKey = "trade-stream-engine-dev-secret-change-me".getBytes(StandardCharsets.UTF_8);
-        this.key = Keys.hmacShaKeyFor(generatedDevKey);
-        log.warn("security.jwt.secret is not configured; using development fallback key for Export Token");
+        byte[] keyBytes = resolveSecretBytes(jwtSecret);
+        this.key = Keys.hmacShaKeyFor(keyBytes);
+        log.info("Export Token signing key loaded from configuration");
     }
 
     private byte[] resolveSecretBytes(String secret) {

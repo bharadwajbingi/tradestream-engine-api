@@ -111,6 +111,7 @@ public class ExportController {
         com.mphasis.tse.entity.ExportJob job = new com.mphasis.tse.entity.ExportJob();
         job.setUserId(userId.orElse(null));
         job.setStatus("PENDING");
+        job.setExportType("MAIN");
         exportJobRepository.save(job);
 
         asyncExportWorker.processActiveTransactionsExport(job.getId(), cleanStart, cleanEnd, fileId, userId);
@@ -139,6 +140,7 @@ public class ExportController {
         com.mphasis.tse.entity.ExportJob job = new com.mphasis.tse.entity.ExportJob();
         job.setUserId(userId.orElse(null));
         job.setStatus("PENDING");
+        job.setExportType("ARCHIVE");
         exportJobRepository.save(job);
 
         asyncExportWorker.processArchivedTransactionsExport(job.getId(), cleanStart, cleanEnd, fileId, userId);
@@ -182,6 +184,7 @@ public class ExportController {
             jobMap.put("status", job.getStatus());
             jobMap.put("createdAt", job.getCreatedAt());
             jobMap.put("downloaded", job.isDownloaded());
+            jobMap.put("exportType", job.getExportType());
             if ("FAILED".equals(job.getStatus())) {
                 jobMap.put("errorMessage", job.getErrorMessage());
             }
@@ -209,7 +212,8 @@ public class ExportController {
         job.setDownloadedAt(java.time.LocalDateTime.now());
         exportJobRepository.save(job);
 
-        String filename = "Trade_Data_Export_" + java.time.LocalDate.now().toString().replace("-", "") + "_" + job.getId().substring(0,8) + ".csv";
+        String label = "ARCHIVE".equals(job.getExportType()) ? "Archive_Table_Data" : "Trade_Data_Main_Table";
+        String filename = label + "_" + java.time.LocalDate.now().toString().replace("-", "") + "_" + job.getId().substring(0,8) + ".csv";
         String s3Url = s3Service.generatePresignedUrl(job.getS3Url(), filename);
         
         java.util.Map<String, String> response = new java.util.HashMap<>();

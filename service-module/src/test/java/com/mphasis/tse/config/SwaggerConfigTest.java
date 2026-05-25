@@ -19,8 +19,8 @@ class SwaggerConfigTest {
 
         Info info = openAPI.getInfo();
         assertNotNull(info);
-        assertEquals("Trade File Processing API", info.getTitle());
-        assertEquals("API documentation", info.getDescription());
+        assertEquals("Trade Stream Processing Engine (TSE) API", info.getTitle());
+        assertTrue(info.getDescription().contains("sandbox and documentation portal"));
         assertEquals("1.0.0", info.getVersion());
 
         assertNotNull(openAPI.getSecurity());

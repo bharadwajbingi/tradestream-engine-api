@@ -22,22 +22,18 @@ public class JwtService {
     @Value("${security.jwt.expiration-time}")
     private long expiration;
 
-    @Value("${security.jwt.secret:}")
+    @Value("${security.jwt.secret}")
     private String jwtSecret;
 
     @PostConstruct
     public void init() throws Exception {
-        if (jwtSecret != null && !jwtSecret.isBlank()) {
-            byte[] keyBytes = resolveSecretBytes(jwtSecret);
-            this.key = Keys.hmacShaKeyFor(keyBytes);
-            log.info("JWT signing key loaded from configuration");
-            return;
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            throw new IllegalStateException(
+                    "security.jwt.secret must be configured. Application cannot start without a JWT signing secret.");
         }
-
-        byte[] generatedDevKey = "trade-stream-engine-dev-secret-change-me".getBytes(StandardCharsets.UTF_8);
-        this.key = Keys.hmacShaKeyFor(generatedDevKey);
-        log.warn("security.jwt.secret is not configured; using development fallback key");
-
+        byte[] keyBytes = resolveSecretBytes(jwtSecret);
+        this.key = Keys.hmacShaKeyFor(keyBytes);
+        log.info("JWT signing key loaded from configuration");
     }
 
     private byte[] resolveSecretBytes(String secret) {
@@ -66,15 +62,48 @@ public class JwtService {
     }
 
     public String extractUsername(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(key)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody()
+                    .getSubject();
+        } catch (Exception e) {
+            log.error("Failed to extract username from token: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    public Date extractExpiration(String token) {
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(key)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody()
+                    .getExpiration();
+        } catch (Exception e) {
+            log.error("Failed to extract expiration from token: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    public boolean isTokenExpired(String token) {
+        Date expirationDate = extractExpiration(token);
+        return expirationDate == null || expirationDate.before(new Date());
     }
 
     public boolean isTokenValid(String token, org.springframework.security.core.userdetails.UserDetails user) {
-        return extractUsername(token).equals(user.getUsername());
+        try {
+            String username = extractUsername(token);
+            if (username == null) {
+                return false;
+            }
+            return username.equals(user.getUsername()) && !isTokenExpired(token);
+        } catch (Exception e) {
+            log.error("Token validation error: {}", e.getMessage());
+            return false;
+        }
     }
 }

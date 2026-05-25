@@ -5,6 +5,12 @@ springdoc:
   api-docs:
     enabled: true
 
+security:
+  jwt:
+    secret: dev-trade-stream-engine-secret-change-me-in-prod
+  totp:
+    encryption-key: dev-totp-encryption-key-32-chars-change
+
 logging:
   level:
     com.mphasis.tse: DEBUG

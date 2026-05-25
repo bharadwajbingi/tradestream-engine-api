@@ -9,6 +9,8 @@ spring:
 security:
   jwt:
     secret: test-trade-stream-engine-secret-123456
+  totp:
+    encryption-key: test-totp-encryption-key-32-chars-ok
 
 logging:
   level:
