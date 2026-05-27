@@ -322,4 +322,4 @@ tradestream-engine-api/
 
 ## License
 
-Proprietary — Mphasis Ltd.
+MIT — Bharadwaj Bingi.
