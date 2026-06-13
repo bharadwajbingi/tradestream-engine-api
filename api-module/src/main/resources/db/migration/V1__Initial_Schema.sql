@@ -158,3 +158,19 @@ CREATE TABLE transaction_registry (
     user_id BIGINT REFERENCES users(id),
     created_time TIMESTAMP
 );
+
+-- Performance indexes
+CREATE INDEX idx_trade_transaction_file_id ON trade_transaction(file_id);
+CREATE INDEX idx_trade_transaction_txn_id ON trade_transaction(transaction_id);
+CREATE INDEX idx_trade_transaction_txn_id_file_id ON trade_transaction(transaction_id, file_id);
+CREATE INDEX idx_file_meta_data_status ON file_meta_data(status);
+CREATE INDEX idx_file_meta_data_user_id ON file_meta_data(user_id);
+CREATE INDEX idx_file_meta_data_user_status ON file_meta_data(user_id, status);
+CREATE INDEX idx_transaction_error_file_id ON transaction_error(file_id);
+CREATE INDEX idx_transaction_error_status ON transaction_error(status);
+CREATE INDEX idx_trade_archive_file_id ON trade_archive(file_id);
+CREATE INDEX idx_transaction_registry_txn_id ON transaction_registry(transaction_id);
+CREATE INDEX idx_transaction_registry_user_id ON transaction_registry(user_id);
+CREATE INDEX idx_export_job_user_id ON export_job(user_id);
+CREATE INDEX idx_deleted_trade_transaction_file_id ON deleted_trade_transaction(file_id);
+CREATE INDEX idx_deleted_transaction_error_file_id ON deleted_transaction_error(file_id);
