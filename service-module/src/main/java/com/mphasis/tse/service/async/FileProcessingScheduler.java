@@ -55,6 +55,14 @@ public class FileProcessingScheduler {
             pendingFile.setStatus(FileStatus.STARTED);
             transactionMetaTableRepository.save(pendingFile);
 
+            // Skip files with missing file path (corrupted data)
+            if (pendingFile.getFilePath() == null || pendingFile.getFilePath().isBlank()) {
+                log.warn("Skipping fileId={} — filePath is null or blank. Marking as FAILED.", pendingFile.getFileId());
+                pendingFile.setStatus(FileStatus.FAILED);
+                transactionMetaTableRepository.save(pendingFile);
+                continue;
+            }
+
             log.info("Scheduler picked up fileId={} filename={} for user={} for processing", 
                     pendingFile.getFileId(), pendingFile.getFilename(), userId);
 
