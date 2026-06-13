@@ -60,10 +60,12 @@ class TradeBatchConfigTest {
         PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
         ItemStreamReader<String[]> reader =
                 mock(ItemStreamReader.class);
+        AsyncTaskExecutor taskExecutor = mock(AsyncTaskExecutor.class);
         Step step = config.tradeProcessingStep(
                 jobRepository,
                 transactionManager,
                 reader,
+                taskExecutor,
                 processor,
                 writer
         );
