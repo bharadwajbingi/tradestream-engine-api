@@ -95,6 +95,7 @@ public class TradeBatchConfig {
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
             ItemStreamReader<String[]> reader,
+            AsyncTaskExecutor stepTaskExecutor,
             ItemProcessor<String[], TradeWrapper> processor,
             ItemWriter<TradeWrapper> writer) {
         return new StepBuilder(STEP_NAME, jobRepository)
@@ -102,6 +103,7 @@ public class TradeBatchConfig {
                 .reader(reader)
                 .processor(processor)
                 .writer(writer)
+                .taskExecutor(stepTaskExecutor)
                 .build();
     }
 

@@ -54,8 +54,6 @@ import java.util.Objects;
 public class FileServiceImpl implements IFileService {
     private final TransactionMetaTableRepository transactionMetaTableRepository;
     private final TransactionErrorRepository transactionErrorRepository;
-    private final AsyncProcessingService asyncProcessingService;
-    private final Job job;
     private final TransactionErrorMapper transactionErrorMapper;
     private final FileLoadMetaDataMapper fileLoadMetaDataMapper;
     private final TransactionMetaTableRepository repository;
@@ -76,13 +74,11 @@ public class FileServiceImpl implements IFileService {
 
         this.transactionMetaTableRepository = transactionMetaTableRepository;
         this.transactionErrorRepository = transactionErrorRepository;
-        this.asyncProcessingService = asyncProcessingService;
         this.transactionMainTableRepository = transactionMainTableRepository;
         this.tradeArchiveRepository = tradeArchiveRepository;
         this.deletedTradeTransactionRepository = deletedTradeTransactionRepository;
         this.deletedTransactionErrorRepository = deletedTransactionErrorRepository;
         this.userRepository = userRepository;
-        this.job = job;
         this.transactionErrorMapper = transactionErrorMapper;
         this.fileLoadMetaDataMapper = fileLoadMetaDataMapper;
         this.repository = repository;
@@ -108,7 +104,7 @@ public class FileServiceImpl implements IFileService {
         );
     }
 
-
+    @Override
     public List<FileLoadMetaDataResponse> searchFileLoads(FileSearchRequest request) {
         Specification<FileLoadMetaData> spec = ownedFileSpec().and(
                 (root, query, cb) -> cb.or(cb.isNull(root.get("isDeleted")), cb.equal(root.get("isDeleted"), false))
@@ -178,7 +174,7 @@ public class FileServiceImpl implements IFileService {
         return new DashboardMetricsResponse(totalFiles, successRecords, errorRecords);
     }
 
-
+    @Override
     public List<TransactionErrorResponse> searchFileErrors(TransactionErrorSearchRequest request) {
         log.info("Search File Errors started");
         Specification<TransactionError> spec = buildErrorSearchSpec(request);
@@ -270,22 +266,7 @@ public class FileServiceImpl implements IFileService {
 
         log.info("Archive File Load completed for id: {}", fileId);
     }
-
-
-
-    private int countCsvRows(String filePath) {
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(filePath))) {
-            int lines = 0;
-            while (reader.readLine() != null) {
-                lines++;
-            }
-            return lines > 0 ? lines - 1 : 0;
-        } catch (Exception e) {
-            log.error("Failed to count lines in CSV file: {}", filePath, e);
-            return 0;
-        }
-    }
-
+    
     @Override
     public FileUploadResponse uploadFile(MultipartFile file) {
         try {
@@ -313,57 +294,6 @@ public class FileServiceImpl implements IFileService {
             throw new RuntimeException("File upload failed: " + e.getMessage());
         }
     }
-
-
-    private void validateFile(MultipartFile file) throws Exception {
-        if (file == null || file.isEmpty()) {
-            throw new EmptyFileException("No file provided. Please select a CSV file.");
-        }
-        String filename = file.getOriginalFilename();
-        if (filename == null || !filename.toLowerCase().endsWith(".csv")) {
-            throw new InvalidFileFormatException("Invalid file type. Only CSV files are allowed.");
-        }
-    }
-
-
-    private String saveFileToDisk(MultipartFile file, Long fileId) throws Exception {
-        String originalFilename = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
-        String filename = fileId + "_" + originalFilename;
-
-        Path uploadPath = Paths.get(tempDir);
-        Files.createDirectories(uploadPath);
-
-        Path filePath = uploadPath.resolve(filename).normalize();
-
-        try (InputStream inputStream = file.getInputStream()) {
-            Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
-        }
-
-        log.info("File saved to: {}", filePath);
-        return filePath.toString();
-
-    }
-
-    private FileLoadMetaData saveInitialMetaData(MultipartFile file) {
-        FileLoadMetaData metaData = new FileLoadMetaData();
-        metaData.setFilename(file.getOriginalFilename());
-        metaData.setUploadTime(LocalDateTime.now());
-        metaData.setStatus(FileStatus.PENDING);
-        metaData.setTotalRecords(0);
-        metaData.setSuccessCount(0);
-        metaData.setErrorCount(0);
-        metaData.setDuplicateCount(0);
-        currentUser().ifPresent(metaData::setUser);
-        return transactionMetaTableRepository.save(metaData);
-    }
-    private JobParameters buildJobParameters(String filePath, Long fileMetaDataId) {
-        return new JobParametersBuilder()
-                .addString("filePath", filePath)
-                .addLong("fileMetaId", fileMetaDataId)
-                .addLong("runId", System.currentTimeMillis())
-                .toJobParameters();
-    }
-
 
     @Override
     public List<FileLoadMetaData> getAllFileLoads() {
@@ -452,6 +382,48 @@ public class FileServiceImpl implements IFileService {
         }
         transactionMetaTableRepository.save(meta);
         log.info("Updated fileId={} status to {}", fileId, meta.getStatus());
+    }
+
+    
+    private void validateFile(MultipartFile file) throws Exception {
+        if (file == null || file.isEmpty()) {
+            throw new EmptyFileException("No file provided. Please select a CSV file.");
+        }
+        String filename = file.getOriginalFilename();
+        if (filename == null || !filename.toLowerCase().endsWith(".csv")) {
+            throw new InvalidFileFormatException("Invalid file type. Only CSV files are allowed.");
+        }
+    }
+
+    private String saveFileToDisk(MultipartFile file, Long fileId) throws Exception {
+        String originalFilename = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
+        String filename = fileId + "_" + originalFilename;
+
+        Path uploadPath = Paths.get(tempDir);
+        Files.createDirectories(uploadPath);
+
+        Path filePath = uploadPath.resolve(filename).normalize();
+
+        try (InputStream inputStream = file.getInputStream()) {
+            Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        log.info("File saved to: {}", filePath);
+        return filePath.toString();
+
+    }
+
+    private FileLoadMetaData saveInitialMetaData(MultipartFile file) {
+        FileLoadMetaData metaData = new FileLoadMetaData();
+        metaData.setFilename(file.getOriginalFilename());
+        metaData.setUploadTime(LocalDateTime.now());
+        metaData.setStatus(FileStatus.PENDING);
+        metaData.setTotalRecords(0);
+        metaData.setSuccessCount(0);
+        metaData.setErrorCount(0);
+        metaData.setDuplicateCount(0);
+        currentUser().ifPresent(metaData::setUser);
+        return transactionMetaTableRepository.save(metaData);
     }
 
     private java.util.Optional<User> currentUser() {

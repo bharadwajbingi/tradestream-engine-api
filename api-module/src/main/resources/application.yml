@@ -24,7 +24,7 @@ spring:
     properties:
       hibernate:
         jdbc:
-          batch_size: 250
+          batch_size: 1000
           fetch_size: 1000
         order_inserts: true
         order_updates: true
@@ -70,7 +70,7 @@ server:
 
 batch:
   trade:
-    chunk-size: ${BATCH_TRADE_CHUNK_SIZE:250}
+    chunk-size: ${BATCH_TRADE_CHUNK_SIZE:1000}
 
 security:
   jwt:

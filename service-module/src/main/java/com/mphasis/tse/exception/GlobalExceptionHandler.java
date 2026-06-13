@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
     @ExceptionHandler(FileNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleFileNotFoundException(FileNotFoundException ex){
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR.value()).body
@@ -39,6 +40,7 @@ public class GlobalExceptionHandler {
                         null
                 ));
     }
+    
     @ExceptionHandler(DuplicateUserException.class)
     public ResponseEntity<ApiResponse<Void>> handleDuplicateUserException(DuplicateUserException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(

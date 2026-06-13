@@ -277,7 +277,7 @@ public class ExportController {
 
         try (Writer writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8);
              CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT.builder().setHeader(ERROR_HEADERS).build())) {
-
+                
             for (TransactionError e : errorsList) {
                 csvPrinter.printRecord(
                         e.getErrorId(),
