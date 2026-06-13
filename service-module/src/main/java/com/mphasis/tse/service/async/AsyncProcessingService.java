@@ -32,12 +32,17 @@ public class AsyncProcessingService {
             log.info("Batch job completed launch cycle. jobId={}, executionId={}, fileMetaId={}",
                     job.getName(), execution.getId(), fileMetaId);
 
+            // Only delete temp file after successful job completion
+            if (execution.getStatus().isUnsuccessful()) {
+                log.warn("Job finished unsuccessfully for fileMetaId={}. Keeping temp file for recovery.", fileMetaId);
+            } else {
+                deleteTempFile(filePath);
+            }
 
         } catch (Exception e) {
             log.error("Async processing failed for fileMetaId={} error={}", fileMetaId, e.getMessage(), e);
             markFileFailed(fileMetaId);
-        } finally {
-            deleteTempFile(filePath);
+            // Don't delete temp file on failure — AutoRecoveryService may retry
         }
     }
 
