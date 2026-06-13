@@ -32,8 +32,8 @@ class AsyncConfigTest {
                 (ThreadPoolTaskExecutor) asyncConfig.stepTaskExecutor();
         assertAll(
                 () -> assertNotNull(executor),
-                () -> assertEquals(12, executor.getCorePoolSize()),
-                () -> assertEquals(24, executor.getMaxPoolSize()),
+                () -> assertEquals(2, executor.getCorePoolSize()),
+                () -> assertEquals(4, executor.getMaxPoolSize()),
                 () -> assertTrue(executor.getThreadNamePrefix().startsWith("StepExecutor-"))
         );
     }
