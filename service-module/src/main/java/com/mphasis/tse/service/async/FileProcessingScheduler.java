@@ -70,6 +70,7 @@ public class FileProcessingScheduler {
             JobParameters jobParameters = new JobParametersBuilder()
                     .addString("filePath", pendingFile.getFilePath())
                     .addLong("fileMetaId", pendingFile.getFileId())
+                    .addLong("runId", System.currentTimeMillis())
                     .toJobParameters();
 
             asyncProcessingService.process(job, jobParameters);
