@@ -32,7 +32,7 @@ class AutoRecoveryServiceTest {
     void noStuckFiles_doesNotSave() {
         when(repository.findByStatusIn(any())).thenReturn(Collections.emptyList());
 
-        service.recoverStuckJobs();
+        service.recoverOnStartup();
 
         verify(repository, never()).save(any());
     }
@@ -47,7 +47,7 @@ class AutoRecoveryServiceTest {
 
         when(repository.findByStatusIn(any())).thenReturn(List.of(stuck));
 
-        service.recoverStuckJobs();
+        service.recoverOnStartup();
 
         assertEquals(FileStatus.PENDING, stuck.getStatus());
         verify(repository).save(stuck);
@@ -68,7 +68,7 @@ class AutoRecoveryServiceTest {
 
         when(repository.findByStatusIn(any())).thenReturn(List.of(f1, f2));
 
-        service.recoverStuckJobs();
+        service.recoverOnStartup();
 
         assertEquals(FileStatus.PENDING, f1.getStatus());
         assertEquals(FileStatus.PENDING, f2.getStatus());
