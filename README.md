@@ -121,7 +121,7 @@ CI/CD Pipeline (GitHub Actions):
 |-------|-----------|
 | Language | Java 17 |
 | Framework | Spring Boot 4.0.3 |
-| Batch Processing | Spring Batch (chunk-based, 250/chunk) |
+| Batch Processing | Spring Batch (chunk-based, 1000/chunk, multi-threaded) |
 | Database | PostgreSQL 15 |
 | Migrations | Flyway |
 | Authentication | JWT (jjwt) + Google OAuth2 + TOTP 2FA |
@@ -252,9 +252,9 @@ Managed by Flyway with `ddl-auto: validate`. Migrations are in `api-module/src/m
 
 | Migration | Description |
 |-----------|-------------|
-| V1 | Initial schema (9 tables) |
-| V2 | Add missing tables for existing databases |
-| V3 | Performance indexes |
+| V1 | Initial schema (9 tables + performance indexes) |
+
+Spring Batch metadata tables are created automatically (`initialize-schema: always`).
 
 ### Tables
 
@@ -282,10 +282,38 @@ All configuration is via environment variables. See `.env.example` for the full 
 | `DB_PASSWORD` | `postgres` | Database password |
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/trade_db` | JDBC URL |
 | `SERVER_PORT` | `8080` | Server port |
-| `BATCH_TRADE_CHUNK_SIZE` | `250` | Records per batch chunk |
+| `BATCH_TRADE_CHUNK_SIZE` | `1000` | Records per batch chunk |
 | `JWT_EXPIRATION_MS` | `1800000` | JWT token lifetime (30 min) |
 | `RATE_LIMIT_REQUESTS_PER_MINUTE` | `120` | Rate limit per IP |
 | `FILE_UPLOAD_TEMP_DIR` | `./data/uploads/` | Temp upload directory |
+
+---
+
+## Performance
+
+| Metric | Result (EC2 t2.micro, 2 vCPU, 908MB) |
+|--------|---------------------------------------|
+| 100K fresh records | ~55 seconds |
+| 100K duplicate records | ~32 seconds |
+| 1M records (estimated) | ~550-650 seconds |
+
+### Tuning (current settings for t2.micro)
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| Chunk size | 1000 | Balance: fewer DB commits vs memory |
+| stepTaskExecutor | core=2, max=4 | Matches 2 vCPU — parallel read/process |
+| Hibernate batch_size | 1000 | Batched INSERTs matching chunk size |
+| JVM | `-Xmx384m -XX:+UseG1GC` | Fits alongside PostgreSQL in 908MB |
+
+### Resilience
+
+- **Multi-threaded processing** — `SynchronizedItemStreamReader` + `synchronized write()` ensure thread safety
+- **3-level deduplication** — in-batch (ConcurrentHashMap) → bulk DB query → registry table
+- **Auto-recovery on startup** — reverts stuck STARTED/PROCESSING files to PENDING
+- **Periodic recovery (every 30 min)** — catches files stuck due to queue rejection or silent failures (only files stuck >30 min)
+- **Idempotent re-processing** — safe to re-process any file; dedup prevents duplicates
+- **Temp file preservation** — only deleted on successful completion; kept for recovery on failure
 
 ---
 
@@ -294,10 +322,10 @@ All configuration is via environment variables. See `.env.example` for the full 
 - **JWT Authentication** — Stateless, 30-minute expiration, HMAC-SHA256
 - **Google OAuth2** — Social login with auto-registration
 - **TOTP 2FA** — Required for export operations; secrets encrypted with AES-256-GCM
-- **Rate Limiting** — 120 requests/minute per IP
-- **Ownership Isolation** — Users can only access their own files and errors
+- **Rate Limiting** — 120 requests/minute per IP (ConcurrentHashMap + AtomicInteger)
+- **Ownership Isolation** — Users can only access their own files and errors (JPA Specifications)
 - **Flyway + validate** — Schema drift detected immediately on startup
-- **No hardcoded secrets** — Application fails to start if JWT_SECRET or TOTP_ENCRYPTION_KEY are missing
+- **Fail-fast secrets** — Application refuses to start if JWT_SECRET or TOTP_ENCRYPTION_KEY are missing
 
 ---
 
