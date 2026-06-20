@@ -50,15 +50,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            var user = userDetailsService.loadUserByUsername(username);
-            if (jwtService.isTokenValid(token, user)) {
-                UsernamePasswordAuthenticationToken auth =
-                        new UsernamePasswordAuthenticationToken(
-                                user,
-                                null,
-                                user.getAuthorities()
-                        );
-                SecurityContextHolder.getContext().setAuthentication(auth);
+            try {
+                var user = userDetailsService.loadUserByUsername(username);
+                if (jwtService.isTokenValid(token, user)) {
+                    UsernamePasswordAuthenticationToken auth =
+                            new UsernamePasswordAuthenticationToken(
+                                    user,
+                                    null,
+                                    user.getAuthorities()
+                            );
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                }
+            } catch (Exception e) {
+                // User not found in DB (deleted after token issued) — don't authenticate.
+                // Request continues unauthenticated → Spring Security returns 401.
+                logger.warn("JWT valid but user lookup failed for '" + username + "': " + e.getMessage());
             }
         }
 

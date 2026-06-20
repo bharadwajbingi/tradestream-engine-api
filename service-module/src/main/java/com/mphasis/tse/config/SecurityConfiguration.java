@@ -39,6 +39,7 @@ public class SecurityConfiguration {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/webjars/**",
+                                "/actuator/**",
                                 "/error"
                         ).permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info", "/health").permitAll()

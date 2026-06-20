@@ -1,9 +1,11 @@
 package com.mphasis.tse;
-
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+// @Configuration
+// @EnableAutoConfiguration
+// @ComponentScan
 @SpringBootApplication
 @EnableScheduling
 public class TradeStreamMain {

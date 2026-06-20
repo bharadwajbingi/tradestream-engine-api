@@ -75,13 +75,13 @@ public class TradeItemWriter implements ItemWriter<TradeWrapper> {
             }
         }
 
-        // Query database in BULK to find already existing transactionIds for this user
+        // Query REGISTRY in BULK to find already existing transactionIds for this user
         java.util.Set<String> existingDbTxnIds = new java.util.HashSet<>();
         if (!candidateTxnIds.isEmpty()) {
             existingDbTxnIds.addAll(
-                tradeTransactionRepository.findExistingTransactionIdsForOwner(candidateTxnIds, ownerUserId)
+                transactionRegistryRepository.findExistingTransactionIdsForOwner(candidateTxnIds, ownerUserId)
             );
-            log.info("Bulk duplicate check: found {} existing transactions in database for {} candidates", 
+            log.info("Bulk duplicate check: found {} existing transactions in registry for {} candidates", 
                     existingDbTxnIds.size(), candidateTxnIds.size());
         }
 

@@ -51,17 +51,17 @@ public class FileProcessingScheduler {
             // Mark user as processing so we don't pick their second pending file
             processingUsers.add(userId);
 
-            // Mark as STARTED
-            pendingFile.setStatus(FileStatus.STARTED);
-            transactionMetaTableRepository.save(pendingFile);
-
-            // Skip files with missing file path (corrupted data)
+            // Skip files with missing file path (corrupted data) — check BEFORE marking STARTED
             if (pendingFile.getFilePath() == null || pendingFile.getFilePath().isBlank()) {
                 log.warn("Skipping fileId={} — filePath is null or blank. Marking as FAILED.", pendingFile.getFileId());
                 pendingFile.setStatus(FileStatus.FAILED);
                 transactionMetaTableRepository.save(pendingFile);
                 continue;
             }
+
+            // Mark as STARTED (claim the file so next scheduler cycle doesn't pick it again)
+            pendingFile.setStatus(FileStatus.STARTED);
+            transactionMetaTableRepository.save(pendingFile);
 
             log.info("Scheduler picked up fileId={} filename={} for user={} for processing", 
                     pendingFile.getFileId(), pendingFile.getFilename(), userId);

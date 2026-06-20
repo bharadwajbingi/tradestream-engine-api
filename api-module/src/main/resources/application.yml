@@ -93,9 +93,9 @@ rate-limit:
 management:
   endpoints:
     web:
-      base-path: /
+      base-path: /actuator
       exposure:
-        include: health,metrics,info
+        include: health,metrics,info,beans,mappings
 
   endpoint:
     health:
