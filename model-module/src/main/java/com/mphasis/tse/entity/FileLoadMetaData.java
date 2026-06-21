@@ -6,10 +6,10 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
-@ToString
 @Entity
 @Table(name = "file_meta_data",indexes = {@Index(name = "idx_filename",columnList = "filename")})
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class FileLoadMetaData {

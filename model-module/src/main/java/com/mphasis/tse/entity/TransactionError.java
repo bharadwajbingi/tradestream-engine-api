@@ -3,16 +3,14 @@ package com.mphasis.tse.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.mphasis.tse.enums.ErrorStatus;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "TRANSACTION_ERROR",indexes = {@Index(name = "idx_transaction_error",columnList = "transaction_id, error_field")})
-@Data
+@Table(name = "transaction_error", indexes = {@Index(name = "idx_transaction_error", columnList = "transaction_id, error_field")})
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

@@ -1,15 +1,17 @@
 package com.mphasis.tse.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "transaction_registry")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 public class TransactionRegistry {
 
