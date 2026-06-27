@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.JobExecution;
 import org.springframework.batch.core.job.parameters.JobParameters;
+import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.nio.file.Path;
 public class AsyncProcessingService {
 
     private final JobOperator jobOperator;
+    private final JobLauncher jobLauncher;
     private final TransactionMetaTableRepository transactionMetaTableRepository;
 
     @Async("jobLauncherExecutor")
@@ -28,7 +30,7 @@ public class AsyncProcessingService {
         String filePath = jobParameters.getString("filePath");
         try {
 
-            JobExecution execution = jobOperator.start(job, jobParameters);
+            JobExecution execution = jobLauncher.run(job, jobParameters);
             log.info("Batch job completed launch cycle. jobId={}, executionId={}, fileMetaId={}",
                     job.getName(), execution.getId(), fileMetaId);
 

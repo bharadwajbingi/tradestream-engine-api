@@ -10,19 +10,19 @@ TSE processes CSV trade files up to 1GB, validates 21 trade fields per record, d
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           TradeStream Engine                                  │
-│                                                                              │
-│  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌─────────────┐  │
-│  │  api-module  │   │service-module│   │ batch-module │   │ dao-module  │  │
-│  │              │   │              │   │              │   │             │  │
-│  │ Controllers  │──▶│ Services     │   │ Batch Config │   │ JPA Repos   │  │
-│  │ REST API     │   │ Security     │──▶│ Processor    │──▶│             │  │
-│  │ Config YAML  │   │ JWT/OAuth2   │   │ Writer       │   │             │  │
-│  │ Flyway SQL   │   │ Validation   │   │ Listener     │   │             │  │
-│  └──────────────┘   │ Mappers      │   └──────────────┘   └──────┬──────┘  │
-│                      │ Schedulers   │                              │         │
-│                      └──────────────┘                              │         │
-│                                                                    ▼         │
+│                             TradeStream Engine                              │
+│                                                                             │
+│  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌─────────────┐   │
+│  │  api-module  │   │service-module│   │ batch-module │   │ dao-module  │   │
+│  │              │   │              │   │              │   │             │   │
+│  │ Controllers  │──▶│ Services     │   │ Batch Config │   │ JPA Repos   │   │
+│  │ REST API     │   │ Security     │──▶│ Processor    │──▶│             │   │
+│  │ Config YAML  │   │ JWT/OAuth2   │   │ Writer       │   │             │   │
+│  │ Flyway SQL   │   │ Validation   │   │ Listener     │   │             │   │
+│  └──────────────┘   │ Mappers      │   └──────────────┘   └──────┬──────┘   │
+│                      │ Schedulers   │                              │        │
+│                      └──────────────┘                              │        │
+│                                                                    ▼        │
 │  ┌──────────────┐                                        ┌─────────────┐    │
 │  │ model-module │◀───────────────────────────────────────│ PostgreSQL  │    │
 │  │              │                                        │    15       │    │
@@ -59,23 +59,23 @@ api-module
                                                                          │
                                                                          ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│  FileProcessingScheduler (polls every 5s)                                     │
-│                                                                               │
-│  1. Find PENDING files (one per user)                                         │
-│  2. Mark as STARTED                                                           │
-│  3. Launch Spring Batch Job                                                   │
-│     ┌─────────────────────────────────────────────────────────────────────┐   │
-│     │  Spring Batch Job                                                    │   │
-│     │                                                                      │   │
-│     │  ┌────────────┐    ┌──────────────────┐    ┌──────────────────┐     │   │
-│     │  │   Reader   │───▶│    Processor     │───▶│     Writer       │     │   │
-│     │  │ (CSV file) │    │ • Validate TXN ID│    │ • Bulk dedup     │     │   │
-│     │  │ chunk=250  │    │ • Batch dedup    │    │ • Save success   │     │   │
-│     │  │            │    │ • 21-field valid  │    │ • Save errors    │     │   │
-│     │  │            │    │ • Map to entity  │    │ • Update registry│     │   │
-│     │  └────────────┘    └──────────────────┘    └──────────────────┘     │   │
-│     └─────────────────────────────────────────────────────────────────────┘   │
-│  4. JobListener updates final status (COMPLETED / COMPLETED_WITH_ERROR / FAILED)│
+│  FileProcessingScheduler (polls every 5s)                                    │
+│                                                                              │
+│  1. Find PENDING files (one per user)                                        │
+│  2. Mark as STARTED                                                          │
+│  3. Launch Spring Batch Job                                                  │
+│     ┌─────────────────────────────────────────────────────────────────────┐  │
+│     │  Spring Batch Job                                                   │  │
+│     │                                                                     │  │
+│     │  ┌────────────┐    ┌──────────────────┐    ┌──────────────────┐     │  │
+│     │  │   Reader   │───▶│    Processor     │───▶│     Writer       │     │  │
+│     │  │ (CSV file) │    │ • Validate TXN ID│    │ • Bulk dedup     │     │  │
+│     │  │ chunk=1000 │    │ • Batch dedup    │    │ • Save success   │     │  │
+│     │  │            │    │ • 21-field valid │    │ • Save errors    │     │  │
+│     │  │            │    │ • Map to entity  │    │ • Update registry│     │  │
+│     │  └────────────┘    └──────────────────┘    └──────────────────┘     │  │
+│     └─────────────────────────────────────────────────────────────────────┘  │
+│  4. JobListener updates final status (COMPLETED/COMPLETED_WITH_ERROR/FAILED) │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -84,24 +84,24 @@ api-module
 ## Deployment Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        AWS EC2 Instance                           │
-│                                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │                    Docker Compose                             │ │
-│  │                                                               │ │
-│  │  ┌───────────────────────┐    ┌───────────────────────────┐  │ │
-│  │  │  trade-backend-service│    │   trade-postgres-db       │  │ │
-│  │  │                       │    │                           │  │ │
-│  │  │  Java 17 (JRE Alpine) │───▶│  PostgreSQL 15 Alpine    │  │ │
-│  │  │  Spring Boot 4.0.3    │    │                           │  │ │
-│  │  │  Port: 8080           │    │  Port: 5432              │  │ │
-│  │  │                       │    │  Volume: postgres_data    │  │ │
-│  │  │  Volume: trade_uploads│    │                           │  │ │
-│  │  └───────────────────────┘    └───────────────────────────┘  │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│                                                                   │
-└─────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                          AWS EC2 Instance                          │
+│                                                                    │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │                        Docker Compose                        │  │
+│  │                                                              │  │
+│  │  ┌───────────────────────┐    ┌───────────────────────────┐  │  │
+│  │  │  trade-backend-service│    │   trade-postgres-db       │  │  │
+│  │  │                       │    │                           │  │  │
+│  │  │  Java 17 (JRE Alpine) │───▶│  PostgreSQL 15 Alpine     │  │  │
+│  │  │  Spring Boot 4.0.3    │    │                           │  │  │
+│  │  │  Port: 8080           │    │  Port: 5432               │  │  │
+│  │  │                       │    │  Volume: postgres_data    │  │  │
+│  │  │  Volume: trade_uploads│    │                           │  │  │
+│  │  └───────────────────────┘    └───────────────────────────┘  │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
          │                                          │
          ▼                                          ▼
 ┌─────────────────┐                    ┌─────────────────────┐
@@ -309,7 +309,7 @@ All configuration is via environment variables. See `.env.example` for the full 
 ### Resilience
 
 - **Multi-threaded processing** — `SynchronizedItemStreamReader` + `synchronized write()` ensure thread safety
-- **3-level deduplication** — in-batch (ConcurrentHashMap) → bulk DB query → registry table
+- **2-level deduplication** — in-batch (ConcurrentHashMap) → bulk DB query (registry table)
 - **Auto-recovery on startup** — reverts stuck STARTED/PROCESSING files to PENDING
 - **Periodic recovery (every 30 min)** — catches files stuck due to queue rejection or silent failures (only files stuck >30 min)
 - **Idempotent re-processing** — safe to re-process any file; dedup prevents duplicates

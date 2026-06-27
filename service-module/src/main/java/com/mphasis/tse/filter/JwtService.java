@@ -1,15 +1,18 @@
 package com.mphasis.tse.filter;
 
+import com.mphasis.tse.entity.User;
+import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import java.security.Key;
 import java.nio.charset.StandardCharsets;
+import java.security.Key;
 import java.util.Base64;
 import java.util.Date;
 
@@ -26,7 +29,7 @@ public class JwtService {
     private String jwtSecret;
 
     @PostConstruct
-    public void init() throws Exception {
+    public void init() {
         if (jwtSecret == null || jwtSecret.isBlank()) {
             throw new IllegalStateException(
                     "security.jwt.secret must be configured. Application cannot start without a JWT signing secret.");
@@ -44,14 +47,13 @@ public class JwtService {
         }
     }
 
-    public String generateToken(org.springframework.security.core.userdetails.UserDetails user) {
-        io.jsonwebtoken.JwtBuilder builder = Jwts.builder()
+    public String generateToken(UserDetails user) {
+        JwtBuilder builder = Jwts.builder()
                 .setSubject(user.getUsername())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expiration));
 
-        if (user instanceof com.mphasis.tse.entity.User) {
-            com.mphasis.tse.entity.User appUser = (com.mphasis.tse.entity.User) user;
+        if (user instanceof User appUser) {
             if (appUser.getName() != null) {
                 builder.claim("name", appUser.getName());
             }
@@ -94,7 +96,7 @@ public class JwtService {
         return expirationDate == null || expirationDate.before(new Date());
     }
 
-    public boolean isTokenValid(String token, org.springframework.security.core.userdetails.UserDetails user) {
+    public boolean isTokenValid(String token, UserDetails user) {
         try {
             String username = extractUsername(token);
             if (username == null) {

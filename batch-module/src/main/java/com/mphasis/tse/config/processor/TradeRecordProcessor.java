@@ -7,8 +7,6 @@ import com.mphasis.tse.entity.TransactionError;
 import com.mphasis.tse.enums.ErrorStatus;
 import com.mphasis.tse.mapper.TradeTransactionMapper;
 import com.mphasis.tse.repository.TransactionMetaTableRepository;
-import com.mphasis.tse.repository.TransactionMainTableRepository;
-
 import com.mphasis.tse.validation.ValidationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.configuration.annotation.StepScope;
@@ -27,7 +25,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TradeRecordProcessor implements ItemProcessor<String[], TradeWrapper> {
     private final ValidationService validationService;
     private final TradeTransactionMapper tradeTransactionMapper;
-    private final TransactionMainTableRepository transactionMainTableRepository;
     private final TransactionMetaTableRepository transactionMetaTableRepository;
     private final Long fileMetaId;
     private final Set<String> seenTransactionIds = ConcurrentHashMap.newKeySet();
@@ -36,12 +33,10 @@ public class TradeRecordProcessor implements ItemProcessor<String[], TradeWrappe
     public TradeRecordProcessor(
             ValidationService validationService,
             TradeTransactionMapper tradeTransactionMapper,
-            TransactionMainTableRepository transactionMainTableRepository,
             TransactionMetaTableRepository transactionMetaTableRepository,
             @Value("#{jobParameters['fileMetaId']}") Long fileMetaId) {
         this.validationService = validationService;
         this.tradeTransactionMapper = tradeTransactionMapper;
-        this.transactionMainTableRepository = transactionMainTableRepository;
         this.transactionMetaTableRepository = transactionMetaTableRepository;
         this.fileMetaId = fileMetaId;
     }

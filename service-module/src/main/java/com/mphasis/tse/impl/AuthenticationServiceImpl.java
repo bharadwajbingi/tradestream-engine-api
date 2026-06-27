@@ -40,7 +40,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 new UsernamePasswordAuthenticationToken(email, password)
         );
 
-        var user = repo.findByEmail(email).orElseThrow();
+        User user = repo.findByEmail(email).orElseThrow();
 
         return jwtService.generateToken(user);
     }
