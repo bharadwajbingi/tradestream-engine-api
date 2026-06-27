@@ -11,7 +11,7 @@ import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.launch.JobOperator;
 import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
-class   AsyncProcessingServiceTest {
+class AsyncProcessingServiceTest {
     @Mock
     private JobOperator jobOperator;
     @InjectMocks
@@ -21,25 +21,26 @@ class   AsyncProcessingServiceTest {
         Job job = mock(Job.class);
         JobParameters params = new JobParameters();
         JobExecution jobExecution = mock(JobExecution.class);
-        when(jobOperator.start(any(Job.class), any(JobParameters.class)))
+        when(jobExecution.getStatus()).thenReturn(org.springframework.batch.core.BatchStatus.COMPLETED);
+        when(jobOperator.run(any(Job.class), any(JobParameters.class)))
                 .thenReturn(jobExecution);
 
         asyncProcessingService.process(job, params);
         verify(jobOperator, times(1))
-                .start(any(Job.class), any(JobParameters.class));
+                .run(any(Job.class), any(JobParameters.class));
     }
     @Test
     void testProcess_exception() throws Exception {
         Job job = mock(Job.class);
         JobParameters params = new JobParameters();
 
-        when(jobOperator.start(any(Job.class), any(JobParameters.class)))
+        when(jobOperator.run(any(Job.class), any(JobParameters.class)))
                 .thenThrow(new RuntimeException("Job failed"));
 
         asyncProcessingService.process(job, params);
 
         verify(jobOperator, times(1))
-                .start(any(Job.class), any(JobParameters.class));
+                .run(any(Job.class), any(JobParameters.class));
     }
 }
 

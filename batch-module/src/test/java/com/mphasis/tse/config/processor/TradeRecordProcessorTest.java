@@ -99,7 +99,6 @@ class TradeRecordProcessorTest {
         processor = new TradeRecordProcessor(
                 validationService,
                 tradeTransactionMapper,
-                transactionMainTableRepository,
                 transactionMetaTableRepository,
                 FILE_META_ID
         );

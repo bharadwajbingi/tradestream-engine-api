@@ -102,7 +102,6 @@ public class BatchPipelineIntegrationTest {
         processor = new TradeRecordProcessor(
                 validationService,
                 tradeTransactionMapper,
-                mainTableRepository,
                 metaTableRepository,
                 1L
         );
