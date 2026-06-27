@@ -28,9 +28,9 @@ public class SwaggerConfig {
                 ### 1. System Design & Asynchronous Architecture
                 TSE completely decouples file upload requests from heavy processing tasks:
                 * **Instant Ingestion:** Files up to **1GB** are uploaded via `POST /file/upload`. The servlet thread writes the file directly to persistent disk, creates a `PENDING` database record, and returns an HTTP `202 Accepted` response instantly (under 1 second).
-                * **Asynchronous Queue:** A background scheduler polls for queued files every 5 seconds. It strictly processes one file per user concurrently, running Spring Batch chunk-based executions (chunk size `1000`).
+                * **Asynchronous Queue:** A background scheduler polls for queued files every 5 seconds. It strictly processes one file per user concurrently, running Spring Batch chunk-based executions (chunk size `250`).
                 * **Background Row Counting:** To eliminate upload latency, file row counting runs fully asynchronously in the background batch thread right before step execution starts.
-                * **Auto-Recovery & Resume:** Interrupted jobs from crashes or container restarts are automatically recovered on boot and resume from the last committed chunk of 1000 records.
+                * **Auto-Recovery & Resume:** Interrupted jobs from crashes or container restarts are automatically recovered on boot and resume from the last committed chunk of 250 records.
                 
                 ---
                 

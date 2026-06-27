@@ -44,8 +44,7 @@ public class ExportTokenFilter extends OncePerRequestFilter {
             if (existingAuth != null && existingAuth.getPrincipal() instanceof com.mphasis.tse.entity.User) {
                 com.mphasis.tse.entity.User userObj = (com.mphasis.tse.entity.User) existingAuth.getPrincipal();
                 if (!userObj.isTotpEnabled()) {
-                    log.warn("Export blocked for user {} — TOTP/2FA not enabled. Must set up TOTP first.", userObj.getEmail());
-                    writeErrorResponse(response, "TOTP/2FA must be enabled before exporting. Please set up TOTP in settings.");
+                    filterChain.doFilter(request, response);
                     return;
                 }
             }
